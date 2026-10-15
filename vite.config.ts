@@ -38,6 +38,7 @@ export default defineConfig({
       '@codemirror/language',
       '@strudel/core',
       '@strudel/webaudio',
+      '@strudel/codemirror',
       'superdough',
     ],
   },

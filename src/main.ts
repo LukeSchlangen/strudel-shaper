@@ -1,6 +1,7 @@
 import '@strudel/repl/repl-component.mjs';
 import { getAudioContext, soundMap } from '@strudel/webaudio';
 import { Pattern, strudelScope } from '@strudel/core';
+import { addWidget, setSliderWidgets, sliderValues } from '@strudel/codemirror';
 import { EditorView } from '@codemirror/view';
 import { StateEffect } from '@codemirror/state';
 import { captureRange } from './capture';
@@ -18,6 +19,7 @@ import { Quantizer } from './quantize';
 import { isRangeIntact, mapRange, splice, type Capture, type Edit, type Range } from './splice';
 import { initialState, slotCount, transition, type Effect, type Slot, type SlotCard, type TrayEvent, type TrayState } from './trayMachine';
 import { Validator, WorkerBackend, type WorkerLike } from './validator';
+import { editorSliderField, holdEffects, sliderIdMap } from './widgets';
 
 // --- Strudel wiring -------------------------------------------------------------------------
 
@@ -215,6 +217,20 @@ document.addEventListener('mousedown', unlockAudio, true);
 /** True during the synchronous start of our own repl.evaluate, when it emits `pending: true`. */
 let ownEval = false;
 
+// Widgets (see src/widgets.ts): while an audition evaluates, afterEval's slider and block widget
+// dispatches are held back, so widgets stay where the editor text has them.
+let auditioning = false;
+/** Editor slider id → its id in the auditioned code, while an option is playing. */
+let sliderMap: Map<string, string> | null = null;
+const sliderField = editorSliderField(setSliderWidgets);
+view.dispatch({ effects: StateEffect.appendConfig.of([sliderField, holdEffects([setSliderWidgets, addWidget], () => auditioning)]) });
+// A slider drag posts the editor's id; while auditioning, the playing code reads the slider under its own id.
+window.addEventListener('message', (e) => {
+  if (e.data?.type !== 'cm-slider' || !sliderMap) return;
+  const id = sliderMap.get(e.data.id);
+  if (id && id !== e.data.id) sliderValues[id] = e.data.value;
+});
+
 /**
  * Serialises evaluations and drops any that were superseded while waiting, so rapid key presses
  * can't land out of order. Resolves true if the code evaluated (or was superseded), false on error.
@@ -222,7 +238,7 @@ let ownEval = false;
  */
 let evalChain: Promise<unknown> = Promise.resolve();
 let evalGeneration = 0;
-function evaluateCode(code: string, label: string): Promise<boolean> {
+function evaluateCode(code: string, label: string, audition?: { range: Range }): Promise<boolean> {
   const generation = ++evalGeneration;
   const result = evalChain.then(async () => {
     if (generation !== evalGeneration) return true;
@@ -232,6 +248,9 @@ function evaluateCode(code: string, label: string): Promise<boolean> {
     // indicator built on them would be wrong while auditioning.
     quantizer.armed = true;
     ownEval = true;
+    // afterEval runs inside repl.evaluate, so the hold covers its widget dispatches.
+    auditioning = !!audition;
+    sliderMap = audition ? sliderIdMap(view.state.field(sliderField), audition.range, code.length - view.state.doc.length) : null;
     let evaluation: Promise<unknown>;
     try {
       evaluation = mirror.repl.evaluate(code);
@@ -239,7 +258,10 @@ function evaluateCode(code: string, label: string): Promise<boolean> {
       ownEval = false;
     }
     // repl.evaluate swallows errors: returns the pattern on success, undefined on failure.
-    const pattern = await evaluation.finally(() => (quantizer.armed = false));
+    const pattern = await evaluation.finally(() => {
+      quantizer.armed = false;
+      auditioning = false;
+    });
     logSwap(label, before, clockSnapshot());
     return pattern !== undefined;
   });
@@ -376,7 +398,7 @@ async function run(effect: Effect) {
       return;
     case 'auditionOption': {
       const code = splice(view.state.doc.toString(), liveRange!, effect.code);
-      const ok = await evaluateCode(code, `option ${effect.slot}`);
+      const ok = await evaluateCode(code, `option ${effect.slot}`, { range: liveRange! });
       if (!ok) await send({ type: 'evalFailed', slot: effect.slot });
       return;
     }
@@ -988,6 +1010,10 @@ Object.assign(window, {
       return mockProvider;
     },
     switchProvider,
+    sliderValues,
+    get sliderMap() {
+      return sliderMap;
+    },
     getState: () => state,
     /** Dev: the live scope and sound names, for src/generated/scope.json and sounds.json (npm run build:reference). */
     dumpScope: () => ({ ...liveScope(), sounds: Object.keys(soundMap.get()).sort() }),
