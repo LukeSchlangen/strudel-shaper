@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Strudel Shaper</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header>
+      <strong>Strudel Shaper</strong>
+      <button id="play" type="button">▶ Play</button>
+      <button id="stop" type="button">■ Stop</button>
+      <span id="status">Click Play to start audio. Select code and press ⌘/Ctrl+K.</span>
+    </header>
+    <main id="editor-wrap"></main>
+    <section id="tray" tabindex="0" hidden aria-label="Variation tray"></section>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

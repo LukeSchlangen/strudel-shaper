@@ -1,0 +1,19 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #161616; color: #ddd; font-family: system-ui, sans-serif; }
+body { display: flex; flex-direction: column; }
+header { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-bottom: 1px solid #333; }
+header button { background: #2a2a2a; color: #ddd; border: 1px solid #444; padding: 4px 10px; cursor: pointer; }
+#status { color: #999; font-size: 13px; }
+#editor-wrap { flex: 1; min-height: 0; overflow: auto; }
+/* <strudel-editor> inserts its CodeMirror container as its next sibling */
+#editor-wrap > div, #editor-wrap .cm-editor { min-height: 100%; }
+#tray { border-top: 1px solid #444; padding: 8px 12px; outline: none; }
+#tray:focus-within, #tray:focus { border-top-color: #7aa2f7; }
+#tray .meta { font-size: 12px; color: #999; margin-bottom: 6px; }
+#tray .stale { color: #f7768e; }
+#tray .cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+#tray .card { border: 1px solid #444; padding: 6px 8px; font-size: 12px; cursor: pointer; }
+#tray .card code { display: block; margin-top: 4px; white-space: pre-wrap; word-break: break-all; color: #aaa; }
+#tray .card.heard { border-color: #9ece6a; background: #1f2a1a; }
+#tray .card.failed { border-color: #f7768e; }
+#tray.is-stale .card:not(:first-child) { opacity: 0.4; }
