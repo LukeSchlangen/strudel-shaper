@@ -28,6 +28,7 @@ const REPL_NAMES = new Set(['setcps', 'setcpm']);
 
 /** Names whose JSDoc is missing or not attached where the parser looks. Written by hand, checked by the test. */
 const MANUAL: Record<string, string> = {
+  silence: '- silence: A pattern with no events. A value, not a function: `stack(s("bd*4"), silence)`, never `silence()`',
   struct: '- struct(binary): Applies a rhythm of `x`/`~` (or 1/0) to the pattern — `note("c3 eb3").struct("x ~ x x")`',
   mask: '- mask(binary): Silences the pattern where the mask is `0`/`~` — `s("hh*8").mask("<1 [0 1]>")`',
   every: '- every(n, func): Applies `func` every n cycles (from the first) — `s("bd sd").every(4, x => x.fast(2))`',
@@ -43,7 +44,7 @@ const MANUAL: Record<string, string> = {
 
 export const CATEGORIES: Array<[string, string[]]> = [
   ['Sources and combining', ['s', 'note', 'n', 'stack', 'cat', 'arrange', 'silence', 'run', 'pick', 'layer', 'superimpose']],
-  ['Signals (continuous 0–1, use with segment/range)', ['sine', 'saw', 'square', 'tri', 'rand', 'perlin', 'choose', 'wchoose', 'range', 'segment']],
+  ['Signals (continuous 0–1 values, not functions: sine.range(200, 800), rand.segment(8))', ['sine', 'saw', 'square', 'tri', 'rand', 'perlin', 'choose', 'wchoose', 'range', 'segment']],
   ['Time', ['fast', 'slow', 'ply', 'off', 'rev', 'iter', 'linger', 'chunk', 'inside', 'swingBy', 'swing', 'press']],
   ['Structure and rhythm', ['struct', 'mask', 'euclid', 'euclidRot', 'legato', 'add', 'sub', 'mul']],
   ['Variation over cycles', ['every', 'firstOf', 'lastOf', 'when', 'sometimes', 'sometimesBy', 'often', 'rarely', 'degrade', 'degradeBy', 'scramble', 'shuffle']],
@@ -115,8 +116,11 @@ function firstSentence(text: string): string {
  */
 const WITH_EXAMPLE = new Set(['pick', 'segment', 'off', 'chunk', 'inside', 'swingBy', 'every', 'firstOf', 'lastOf', 'when', 'sometimesBy', 'jux', 'echoWith', 'superimpose', 'layer', 'euclid', 'struct', 'mask', 'scale', 'voicing', 'chord', 'arp', 'rootNotes', 'chop', 'slice', 'linger', 'ply', 'range']);
 
+/** Patterns exported as values, not functions: `sine.range(…)`, never `sine()` (that throws). */
+export const VALUES = new Set(['sine', 'cosine', 'saw', 'square', 'tri', 'rand', 'perlin', 'silence']);
+
 function entry(name: string, doc: Doc | undefined): string {
-  const sig = `${name}(${doc?.params.join(', ') ?? ''})`;
+  const sig = VALUES.has(name) ? name : `${name}(${doc?.params.join(', ') ?? ''})`;
   const summary = doc?.summary ? `: ${doc.summary}` : '';
   const ex = doc?.example && WITH_EXAMPLE.has(name) ? ` — \`${doc.example}\`` : '';
   return `- ${sig}${summary}${ex}`;

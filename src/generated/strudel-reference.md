@@ -8,19 +8,19 @@ Names below exist in this Strudel build. Functions are also methods: `s("bd").fa
 - stack(): The given items are played at the same time at the same length
 - cat(items): The given items are concatenated, where each one takes one cycle
 - arrange(): Allows to arrange multiple patterns together over multiple cy…
-- silence(): Does absolutely nothing.
+- silence: A pattern with no events. A value, not a function: `stack(s("bd*4"), silence)`, never `silence()`
 - run(): A discrete pattern of numbers from 0 to n-1
 - pick(pat, xs): Picks patterns (or plain values) either from a list (by index…
 - layer(): Layers the result of the given function(s)
 - superimpose(): Superimposes the result of the given function(s) on top of th…
 
-## Signals (continuous 0–1, use with segment/range)
-- sine(): A sine signal between 0 and 1
-- saw(): A sawtooth signal between 0 and 1
-- square(): A square signal between 0 and 1
-- tri(): A triangle signal between 0 and 1
-- rand(): A continuous pattern of random numbers, between 0 and 1
-- perlin(): Generates a continuous pattern of perlin noise, in the range…
+## Signals (continuous 0–1 values, not functions: sine.range(200, 800), rand.segment(8))
+- sine: A sine signal between 0 and 1
+- saw: A sawtooth signal between 0 and 1
+- square: A square signal between 0 and 1
+- tri: A triangle signal between 0 and 1
+- rand: A continuous pattern of random numbers, between 0 and 1
+- perlin: Generates a continuous pattern of perlin noise, in the range…
 - choose(xs): Chooses randomly from the given list of elements
 - wchoose(pairs): Chooses randomly from the given list of elements by giving a…
 - range(): Assumes a numerical pattern, containing unipolar values in th…

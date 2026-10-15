@@ -272,6 +272,7 @@ Use headphones. Reload, and **don't click**. Press ⌘K, then Esc, then Ctrl+Ent
 
 ## Open problems
 
+- **`silence()` was in the first reference** as if it were a function (it's a value), and parallel Haiku used it twice on "mute the pad" (`silence is not a function`, then retried). The reference now has a hand-written `silence` entry, and the signals (`sine`, `saw`, `rand`, …) are listed as values (`sine.range(…)`), not as `sine()`; a test checks it. The sweeps above ran before that fix.
 - **Physical ⌘J / ⌘⇧J** still need a hand check (see Keyboard).
 - **The `armed` window spans the whole async `repl.evaluate`** (a few ms, longer on the first eval while samples load). An outside Ctrl+Enter that lands inside that window would be quantized too. It's harmless (it just lands on the beat), but it isn't strictly "outside evals are immediate".
 - **The Drawer's look-back after settling.** Once a swap has landed, `settle()` swaps the stitched wrapper for the plain new pattern, so a Drawer query reaching back before `N` would see the new pattern. Highlighting only shows the present, so nothing visible changes; a painter using `drawTime[0] < 0` (e.g. `pianoroll`) could repaint the last ≤1 cycle with the new pattern.
@@ -440,3 +441,233 @@ Use headphones. Open `/?faultRate=0.5`, press ⌘K → Esc, then Ctrl+Enter.
 - **Option-scoped events need mini-notation** in the option. Options built only from single-quoted strings, numbers or signals fall back to whole-buffer counting, where an empty option inside a sounding stack isn't flagged.
 - **Mock exhaustion**: with 7 transforms, 4 planned options plus 4 retries in one request can't all be distinct. Real providers won't have this limit.
 - **Worker memory**: one worker for the page's lifetime, replaced after a timeout. The pre-emption is verified, but not long sessions (hours).
+
+---
+
+# Milestone 4 notes: the first real model (Claude)
+
+`?provider=claude` (or the header select, or Alt+P) sends ⌘K requests to Claude through a local proxy; options stream in, are validated as before, and audition and commit work unchanged. The mock stays available (offline demo, faulty mode) and still answers ⌘J / ⌘⇧J. Checked in Chrome on macOS against `npm run dev`. `npm test` (291 tests) and `npm run build` pass; no test calls the real API.
+
+## Where things live
+
+| File | What |
+| --- | --- |
+| `server/index.ts`, `server/app.ts` | The proxy (Hono on `@hono/node-server`, 127.0.0.1:8787): `POST /api/options` (NDJSON), `POST /api/warmup`. Reads `.env` |
+| `server/providers/claude.ts` | The Claude adapter: request building, streaming, idle timeout, refusal/max_tokens handling, the parallel strategy, warm-up |
+| `server/prompt.ts` | Role and rules, prompt layout, the output schema |
+| `server/jsonStream.ts` | Incremental parser: emits each option the moment its JSON object closes |
+| `server/providers/postprocess.ts`, `models.ts`, `server/errors.ts`, `server/rateLimit.ts` | Fitting options back into the buffer; per-model prices and thinking settings; SDK error → status-line message; the per-minute limit |
+| `src/remoteProtocol.ts` | The wire format shared by browser, proxy and eval (provider-neutral) |
+| `src/remoteProvider.ts` | `RemoteProvider`: the browser side of any proxied model. Nothing Claude-specific |
+| `src/feedback.ts` | Retry feedback as instructions, `SILENCE_WORDS`, reason labels |
+| `src/soundSummary.ts` | The loaded sounds, compacted for the prompt |
+| `src/widgets.ts` | Widget hold during audition, slider id bridge |
+| `scripts/build-reference.ts` → `src/generated/strudel-reference.md` | The Strudel reference in the prompt (`npm run build:reference`) |
+| `src/generated/scope.json`, `sounds.json` | The live scope and sound names, saved from the page with `await __shaper.saveScope()` (dev only) |
+| `eval/` | The eval harness, fixtures, reports and `listen.html` |
+
+`Provider.generateOptions(req, signal, hooks?)` gained an optional third argument: `hooks.onStats` receives provider-neutral stats (timings, token counts, cost). `ProviderError(kind, message)` is the provider-neutral failure. DiffusionGemma only needs a new server adapter that produces the same NDJSON lines.
+
+## Anthropic API details used (read 2026-10-15)
+
+- **Models** (https://platform.claude.com/docs/en/models/overview): `claude-haiku-5-5` (default) and `claude-sonnet-5-5`. Prices per MTok (https://platform.claude.com/docs/en/about-claude/pricing), input / 5-min cache write / cache read / output: Haiku 5.5 $0.10 / $0.125 / $0.01 / $0.50 (prompts ≤ 100k tokens); Sonnet 5.5 $2 / $2.50 / $0.10 / $10. `server/providers/models.ts` holds them; costs in the status line and eval come from them.
+- **Structured outputs** (https://platform.claude.com/docs/en/build-with-claude/structured-outputs): `output_config.format = { type: "json_schema", schema }`. Works with streaming: the JSON arrives as ordinary `text_delta`s, which `server/jsonStream.ts` parses incrementally.
+  - **Surprise: `maxItems` is not supported, and `minItems` only accepts 0 or 1.** "3–4 options" can't be in the schema. It's in the prompt, and the server keeps at most 4 (`MAX_OPTIONS`). One schema (`minItems: 1`) serves full requests, retries and parallel calls, so they share one compiled grammar.
+  - The first request with a new schema compiles a grammar (cached 24 h from last use). Changing the schema's structure recompiles it and also invalidates the prompt cache; changing only names/descriptions doesn't.
+  - `stop_reason: "refusal"` and `"max_tokens"` can leave invalid JSON. Both become an error line after any options that did complete.
+- **Thinking** (https://platform.claude.com/docs/en/build-with-claude/thinking) and **effort** (https://platform.claude.com/docs/en/build-with-claude/effort): both models think adaptively by default, with `display: "omitted"` (thinking tokens are billed and delay the first text token, but aren't shown).
+  - Haiku 5.5 turns it off with `thinking: { type: "disabled" }`, at effort high or below. Default effort `medium`.
+  - **Surprise: Sonnet 5.5 rejects `disabled` with a 400**; its lowest setting is `thinking: { type: "between_tools" }` (no up-front thinking; without tools that means none), at effort high or below. Default effort `high`.
+  - `output_config.effort`: `low | medium | high | xhigh | max`. We only allow up to `high`.
+- **Prompt caching** (https://platform.claude.com/docs/en/build-with-claude/prompt-caching): `cache_control: { type: "ephemeral" }` (5 min), up to 4 breakpoints, minimum 512 tokens on both models, prefix order tools → system → messages. Changing thinking or effort settings invalidates it. Usage reports `cache_creation_input_tokens` and `cache_read_input_tokens`.
+- **Streaming** (https://platform.claude.com/docs/en/build-with-claude/streaming): `client.messages.create({ …, stream: true }, { signal })` with the official `@anthropic-ai/sdk` (0.134.0). Events used: `message_start` (input and cache usage), `content_block_delta` / `text_delta`, `message_delta` (stop reason, output tokens). The SDK's `signal` cancels the HTTP request.
+- **Other surprises:** the SDK's default timeout is 10 minutes, and in the first sweep two streams stalled for 460 s and 940 s. The adapter now aborts a call after 20 s without a stream event (`idleTimeoutMs`) and reports `timeout`. Overloaded (529) surfaces as `InternalServerError` with `status === 529`.
+
+## The proxy
+
+- `npm run dev` starts Vite and the proxy (`concurrently`); Vite forwards `/api/*` to `127.0.0.1:8787`. `npm run dev:web` is Vite alone.
+- `ANTHROPIC_API_KEY` comes from `.env` (git-ignored; `.env.example` is committed) or the shell environment. The proxy binds to 127.0.0.1 only.
+- **NDJSON lines:** `{type:"option",label,code}` per option; then `{type:"done",timing,usage,costUsd}`; or `{type:"error",kind,message}`.
+  - `kind` is one of `auth`, `rate-limit`, `local-rate-limit`, `overloaded`, `refusal`, `truncated`, `bad-request`, `network`, `timeout`, `internal`.
+  - Messages are short and fixed ("The API key was rejected. Check ANTHROPIC_API_KEY in .env."). Stack traces only reach the server log.
+- **Guard rails:** `MAX_TOKENS` (default 2048, clamped to 4096); `RATE_LIMIT_PER_MIN` (default 20) counts every upstream call, so one ⌘K with four retries uses five; the SDK retries once (`maxRetries: 1`).
+- **Logging:** one line per request: model, strategy, retry or not, ms, first option ms, usage and cost; `aborted: true` when the browser went away.
+- **Abort:** the request's own signal (`c.req.raw.signal`, which `@hono/node-server` aborts when the client disconnects) is passed to the SDK.
+  - Verified with `curl --max-time 1` against the real API: `{"aborted":true,"ms":1003}`, and no usage line.
+  - Verified in Chrome: R while cards were streaming logged `aborted … ms: 13`; Esc twice logged `aborted … ms: 511`.
+  - Tested with a fake SDK client (`test/claudeAdapter.test.ts`).
+
+### The key never reaches the browser
+
+- `npm run check:key` builds and scans every file in `dist/` for the key's value, for `sk-ant-` followed by 10 or more key characters, and for the string `ANTHROPIC_API_KEY`. Result: 8 files scanned, nothing found.
+- Only `server/` reads the key; `src/` has no access to `process.env`, and Vite only exposes `VITE_`-prefixed variables to the client.
+- Response bodies are option, done and error lines built by our own code; the auth error text names the variable, never its value.
+
+## The prompt
+
+In cache order (prefix first):
+1. **System block 1, cached:** the role and rules (`server/prompt.ts` `ROLE`), then the Strudel reference. ~5.1k tokens. Identical for every request, so every request after the first in a 5-minute window reads it from the cache.
+2. **System block 2, cached:** the sound summary. ~2.2k tokens. Stable for a page session (it's built from the live `soundMap` once prebake finishes).
+3. **User message, per request:**
+   - tempo;
+   - the whole buffer with `/*<sel>*/…/*</sel>*/` around the selection;
+   - the instruction, or "none. Offer varied, musically interesting directions.";
+   - the buffer's current eval error, if there is one;
+   - on a retry, the rejected code plus the feedback and "Return exactly one option.";
+   - for the parallel strategy, a direction hint.
+
+**Why:**
+- The whole buffer gives the model context (key, tempo, other parts, sounds already in use), and the sentinels say exactly what to replace.
+- The rules ask for code that replaces only the marked text, keeps its role and form, and has no trailing `,`/`;`. `postprocess.ts` enforces that anyway: it strips echoed sentinels and trailing separators and clips labels to 4 words.
+- The "distinct directions" list (rhythm, texture/timbre, pitch/harmony, structure over time, space) plus "options that differ only in a number are not distinct" stops four `gain` tweaks.
+- Instructions asking to remove or mute something allow a silent option; anything else must make sound.
+
+**The reference** (`npm run build:reference`, ~4.3k tokens):
+- It reads the JSDoc of the installed `@strudel/core`, `tonal`, `codemirror` (slider), `webaudio` (scope) and `draw` (pianoroll) packages. It keeps a curated list of 93 names in 11 groups, each of which must exist in the live scope (tested). Nine entries whose JSDoc is missing or not attached where the parser looks (`struct`, `mask`, `every`, `setcps`/`setcpm`, `._scope`/`._pianoroll`, …) are written by hand in the builder.
+- Examples are only kept for functions whose call shape isn't obvious (callbacks, chord and scale strings), because each costs about 15 tokens.
+- The hand-written mini-notation rules and 8 full examples (`scripts/reference-extras.md`) are evaluated in the Sandbox by the tests.
+- **Surprise:** chars/4 underestimates this text badly. The first version, "~4.8k tokens" by that estimate, was 7.5k real tokens (`npm run count:prompt` uses the free count_tokens endpoint), and the full sound list was 4.4k. Code and short names tokenize at about 2.1 characters per token, so both were cut.
+
+**The sound summary** (`src/soundSummary.ts`) groups the 1650 names into:
+- the common drums;
+- the synth waveforms;
+- 12 well-known drum machines with their exact sounds;
+- the other banks by name (aliases such as `tr909`/`rolandtr909` folded into the longer name);
+- General MIDI instruments;
+- the other plain names;
+- the multi-sample instrument families as `name_*`.
+
+A test checks that every loaded sound is findable from it.
+
+### Caching
+
+Every request after the first reads ~7.3k of its ~7.8k input tokens from the cache (eval: 7266–7648 cache-read tokens per request). For Haiku that makes a request cost about $0.0002–0.0003 instead of ~$0.0009. In the browser the status line shows it: `tokens 5.4k in (5.3k cached) / 180 out · $0.0002` (before the reference was trimmed).
+
+## Validation changes
+
+- **Buffer baseline.** `Validator.baseline(buffer)` checks the unmodified buffer once per request, as the first job in the worker's validation queue. If it fails, any option that fails with the *same* error (same stage and message, line:col ignored) is checked **alone**: the buffer's top-level `setcps`/`setcpm` lines plus the option, judged by its own events.
+  - It passes → kept, with a "checked alone" badge (its tooltip warns that auditioning plays the whole buffer, which may fail).
+  - It fails the same way alone → dropped as `buffer error`, without a retry.
+  - It fails in its own way → the normal retry.
+  - The status line shows `buffer has an error: …`.
+  - Verified in Chrome: with `.wobble(2)` added to the kick line, ⌘K on the hi-hat line gave 4 cards, all "checked alone". Auditioning one made the card `failed` (the live repl evaluates the spliced, still broken buffer), and the original kept playing. That is the behaviour agreed for this milestone.
+- **Silent options are retried.** An option that validates with an `empty` or `unknown-sample` warning gets one retry with app-written feedback:
+  - "This option produces no sound. Return a variation that still plays."
+  - "`zzzz` is not a loaded sound. Use only loaded sounds, for example: bd sd hh oh cp rim lt mt."
+  - If the replacement still warns, it's kept with its badge. If the replacement fails outright, the slot falls back to the original warned option rather than ending empty.
+- **The exception:** `empty` is not retried when the instruction asks for silence.
+  - `SILENCE_WORDS = drop, mute, silence, silent, remove, stop, cut, out`, matched as whole words with inflections (dropped, muting, cutting, …), so "lower the cutoff", "output", "less busy" and "droplets" don't count. Tested in `test/baseline.test.ts`.
+  - Verified in Chrome: Claude with "drop the hats" returned `s("hh*8").mask("0").gain(0.6)` and kept it with its `empty` badge, without a retry. The faulty mock with `faultKind = 'empty'` and no instruction had all four retried and replaced.
+- **Feedback reads as instructions** (`src/feedback.ts`), e.g. "This code has a syntax error (Unexpected token (2:5)). Return valid Strudel code: check brackets, quotes and mini-notation." or "`wobble` is not a Strudel function here. Use only functions from the reference." A test checks that every message contains "Return", "Use" or "Suggest" and doesn't start with a log-style `reason:` prefix.
+
+## Widgets during audition: hold back the dispatch
+
+**Choice:** while an audition evaluates, a transaction filter (`holdEffects`) strips the `setSliderWidgets` and `addWidget` effects that StrudelMirror's `afterEval` dispatches. The editor keeps the widgets of its own text. Evaluating the original (0/Esc, commit, or the user's Ctrl+Enter) dispatches them normally.
+
+**Why not map positions by the splice delta:**
+- Widgets inside the option have no editor position to map to.
+- Block widget DOM ids are index-based (`getWidgetID` → `_widget__scope_<index>`), so the editor's existing scope canvas already shows the auditioned pattern.
+- Re-placing decorations on every swap would rebuild widget DOM, including the scope canvases, at each key press.
+
+**Sliders need one more step:**
+- A slider's id is `slider_<position in the evaluated code>`. Dragging one edits the text and posts the id from its last editor evaluation.
+- During an audition the pattern reads the slider under its position in the *spliced* code, so a drag would have no effect on sliders after the selection.
+- `editorSliderField` tracks the editor's sliders through edits, `sliderIdMap` translates editor ids to audition ids, and `main.ts` mirrors `cm-slider` messages onto the audition id while an option plays.
+
+**Verified in Chrome** with sliders before, inside and after the selection, and a `._scope()` after the selection (run A) or inside it (run B):
+- During every audition, the widget DOM stayed at its editor positions, although the auditioned code's widget metadata had moved (e.g. the bass slider at 154 instead of 145, the scope at 179 instead of 170).
+- After returning to the original, the widgets were in place.
+- Dragging the bass slider during an audition set `sliderValues.slider_154` (the audition id) to the dragged value, and the tray didn't go stale (the edit is outside the range).
+- Tests: the filter and the slider field against a real `EditorState`, and `sliderIdMap` against the transpiler's own widget ids.
+
+## Provider switching and status
+
+- **Choosing the provider:** `?provider=mock|claude&model=claude-haiku-5-5|claude-sonnet-5-5`; the header select; Alt+P cycles mock → Haiku → Sonnet. Switching updates the URL (`replaceState`) and applies to the next request; R regenerates with it. There is no automatic fallback: an API error stays in the status line.
+- **Optional settings:** `&effort=low|medium|high&thinking=off|adaptive&strategy=single|parallel&warmup=0`. Unset means the server's per-model defaults.
+- **Status line:** `provider: claude · haiku-5-5 · first 998 ms · last 1.8 s · 4 ok · 0 retried · 0 dropped · validation 3.2 ms avg / 4.8 ms max · tokens 7.8k in (5.4k cached) / 252 out · $0.0005 · …`, plus the error and `buffer has an error: …` in red.
+
+## Eval harness
+
+- **Run it:** `npm run eval -- --provider claude --model claude-haiku-5-5 [--thinking off|adaptive] [--effort low|medium|high] [--strategy parallel] [--warmup] [--only id,id] [--label name]`. It writes `eval/reports/<time>-<label>.json` and `.md`. Needs the key; about $0.006 per Haiku run and $0.10 per Sonnet run.
+- **Fixtures** (`eval/fixtures.json`): 20 requests over 5 buffers (drums, bass, chords, melody, effects). Each buffer is tested to evaluate with loaded sounds, and each selection to evaluate on its own. The instructions are 5 empty, 12 musical ("busier in the second half", "call and response with the kick", "darker", "half-time feel", …) and 3 asking for silence.
+- **What it runs:** the browser's own path. `RemoteProvider` is wired straight to the proxy app (`app.request`, no network or rate limit), then `runRequest` and the real `Validator`, over the Sandbox in a `worker_threads` worker so `WorkerBackend`'s 250 ms pre-emption works. TypeScript loads through a Vite module runner (`eval/vite-runner.mjs`) with the tests' `@kabelsalat/web` alias.
+- **Timing:** "first card" is the first validated option, measured from the request's start, so validation is included.
+- **Listening:** `http://localhost:5173/eval/listen.html` (dev server). Pick a report, then N/P to step through requests, 1–4 to audition (beat-quantized, as in the tray), 0 for the original. Rate each option and add a note; notes are kept per report in localStorage and exported as JSON.
+
+### Results (20 requests each, 2026-10-15, one run per config)
+
+| Model | Thinking | Effort | First card p50 / p90 / max | First card ≤ 2 s | Last slot p50 | Pass rate, first attempt | Requests with ≥ 3 cards | Cost / request |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Haiku 5.5 | off (`disabled`) | low | **1.28 / 2.38 / 2.40 s** | **17/20** | 2.20 s | 97% (67/69) | 19/20 | $0.0003 |
+| Haiku 5.5 | off | medium | 1.25 / 1.44 / 2.19 s | 19/20 | 2.04 s | 91% (61/67) | 18/20 | $0.0002 |
+| Haiku 5.5 | adaptive (default) | medium (default) | 4.26 / 7.83 / 8.66 s | 0/20 | 6.02 s | 92% (66/72) | 19/20 | $0.0007 |
+| Sonnet 5.5 | off (`between_tools`) | low | **1.57 / 1.85 / 2.12 s** | **19/20** | 3.10 s | 100% (75/75) | 19/20 | $0.0055 |
+| Sonnet 5.5 | off | medium | 1.71 / 2.22 / 2.26 s | 18/20 | 3.34 s | 100% (78/78) | 20/20 | $0.0047 |
+| Sonnet 5.5 | adaptive (default) | high (default) | 2.43 / 7.31 / 7.34 s | 6/20 | 4.74 s | 96% (77/80) | 20/20 | $0.0073 |
+
+- **Thinking decides the latency.** With adaptive thinking (each model's default), the first card misses 2 s on most requests and p90 is over 7 s. With thinking off, both models meet the 2 s target on 17–19 of 20 requests.
+- The first-attempt pass rate is 91–100% for every config. Retries were for `eval` (unknown functions), `query`, `empty` and `unknown-sample`; no slot was dropped for good except one duplicate.
+- **Defaults chosen** (`server/providers/models.ts`): thinking off, effort low, for both models. For Haiku, low gives a better pass rate than medium (97% vs 91%) at the same latency and cost. For Sonnet, low is slightly faster at the same pass rate.
+- Haiku often returns 3 options rather than 4 (69 of 80 slots); Sonnet nearly always returns 4.
+- "Last slot settled" is 2–3 s because Haiku writes 3–4 options of ~70 output tokens each after the first, and retries add 1–2 s. The first card is the number the 2 s target is about.
+- An earlier sweep had silently run all three Haiku configs at the defaults (a shell quoting mistake). Its two 460 s / 940 s stalls led to the idle timeout. Those reports were deleted.
+
+### One request vs. four in parallel
+
+`--strategy parallel` (or `?strategy=parallel`): four one-option calls at once, each with a different direction hint (rhythm and groove / texture and timbre / pitch and harmony or structure / space and movement or structure). Thinking off, effort low:
+
+| Model | Strategy | First card p50 / p90 / max | ≤ 2 s | Last slot p50 | Pass rate, first attempt | Cards shown | Cost / request |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Haiku 5.5 | single | 1.28 / 2.38 / 2.40 s | 17/20 | 2.20 s | 97% | 69/80 | $0.0003 |
+| Haiku 5.5 | parallel | **0.99 / 1.10 / 1.12 s** | **20/20** | 1.57 s | 91% | 78/80 | $0.0008 |
+| Sonnet 5.5 | single | 1.57 / 1.85 / 2.12 s | 19/20 | 3.10 s | 100% | 75/80 | $0.0055 |
+| Sonnet 5.5 | parallel | 1.54 / 1.91 / 2.11 s | 19/20 | 2.22 s | 95% | 80/80 | $0.0091 |
+
+- **Parallel Haiku is the fastest config measured:** every first card in under 1.2 s, the last slot settled almost a second sooner, and always 4 options. It costs 2.7× as much (still under a tenth of a cent), and the pass rate dropped to 91%. Most of those retries were duplicates: the four calls can't see each other, so on silence requests several returned the same `s("hh*8").gain(0)`.
+- Sonnet barely gains on the first card (each call still pays Sonnet's time to first token) but always fills 4 slots.
+- **The default stays `single`**, as the brief asks: it meets the target on 17/20 (Haiku) and 19/20 (Sonnet) requests at the lowest cost, and one call per ⌘K keeps the rate limit simple. Parallel is one URL parameter away and would be the choice if the 2 s target is made strict.
+
+### Warm-up
+
+The question is whether a warm-up request after the first user gesture saves the first real request the grammar compile and the prompt-cache write. A cold grammar was forced by giving the schema a never-used top-level key (`--schema-key`; a structural change also invalidates the prompt cache). Two trials, three requests each:
+
+| Trial | First request (cold), no warm-up | First request after a warm-up | Warm-up itself |
+| --- | --- | --- | --- |
+| 1 | 1.76 s | 1.93 s | 2.14 s |
+| 2 | 2.40 s | 1.59 s | 2.06 s |
+| Steady state (sweep p50) | 1.28 s | | |
+
+- **The compile costs little here.** A cold first request was 0.5–1.1 s slower than the steady state; with a warm-up first it was 0.3–0.7 s slower. With two trials, that difference is within the noise; I can't claim the warm-up saves a measurable amount of latency.
+- **It does move the cache write** (~7.3k tokens, about $0.0009 on Haiku, $0.018 on Sonnet) off the first ⌘K. In ordinary use the page is open for more than 2 s before the first ⌘K, so the warm-up has finished by then.
+- **It stays on by default** because it is cheap and can't hurt. `?warmup=0` turns it off. In the browser it is sent with the selected model and settings, so it warms the right cache.
+- Seen in the browser: pressing ⌘K right after load, while the warm-up was still in flight, meant both requests wrote the cache (`cacheWrite: 5251` on both). The warm-up only helps when it finishes first.
+
+## Listening checklist (milestone 4)
+
+Use headphones. Run `npm run dev` with the key in `.env`, open `/?provider=claude`, press ⌘K → Esc, then Ctrl+Enter.
+
+- [ ] ⌘K on the hi-hat line, Enter (no instruction). Cards start appearing within about 1.5 s; the status line shows `provider: claude · haiku-5-5`, first/last times, and `tokens … (… cached)` with a cost. Every card plays. The four sound different from each other (rhythm vs. sound vs. space), not just louder/softer.
+- [ ] ⌘K on the bass line with `darker`. Every option is darker (filter, octave, sound) and stays in key with the rest.
+- [ ] ⌘K on the kick with `call and response with the kick`, `half-time feel`, then `busier in the second half`. Each card follows the instruction, and changes land on the beat as before.
+- [ ] ⌘K on the hi-hat line with `drop the hats`. A silent card may appear with an `empty` badge, and it isn't retried.
+- [ ] Press R while cards are arriving: they reset, and the proxy terminal logs `aborted`. Same for a new ⌘K, and for Esc twice.
+- [ ] Audition a card, Enter: the line changes, one ⌘Z restores it.
+- [ ] Add `.wobble(2)` to the kick line (don't evaluate), ⌘K on the hi-hat line: cards show `checked alone`, and the status line says `buffer has an error: s(...).wobble is not a function`. Auditioning one marks it failed; the original keeps playing. Remove `.wobble(2)` again.
+- [ ] Alt+P to Sonnet, ⌘K on the bass line: cards take a little longer and cost more (status line). Alt+P to mock: the old mock options, offline.
+- [ ] Put `.gain(slider(0.6, 0, 1))` on the hi-hat line and `._scope()` on the bass line, Ctrl+Enter, ⌘K on the hi-hat line, audition cards: the slider and scope don't move. Drag the bass line's slider while an option plays: it still changes the sound.
+- [ ] Set a wrong key in `.env`, restart `npm run dev`, ⌘K: the status line says the key was rejected, and the mock is **not** used instead.
+- [ ] `/eval/listen.html`: pick the Haiku report, N/P through requests, 1–4 to audition. Rate a few cards; Export notes downloads them.
+
+## Open problems
+
+- **"Checked alone" cards can't be heard** while the buffer is broken: auditioning evaluates the whole spliced buffer, which fails. That is the behaviour agreed for this milestone. An "audition alone" mode (only the option plus tempo) would make them audible.
+- **Two `._scope()` widgets in one buffer render wrongly** even without auditioning: the second canvas lands in the wrong place and the line it belongs to looks empty. Strudel's `BlockWidget.eq()` always returns `true` (`@strudel/codemirror/widget.mjs`), so CodeMirror reuses one widget's DOM for another. Upstream; one scope per buffer works.
+- **An option that adds a `._scope()` before an existing one** shifts the block widget indexes, so during the audition the existing canvas shows the new scope. Visual only, and it resets on returning to the original.
+- **Haiku often returns 3 options**, not 4 (69/80 slots), even though the prompt asks for "3 or 4". The parallel strategy always fills 4.
+- **Retries cost a full prompt each** (cached, so ~$0.0002 on Haiku), and count against the per-minute limit; a ⌘K with four retries uses five of the 20 calls.
+- **Quality isn't measured by the pass rate.** Cards that validate can still be musically odd: Sonnet once gave `s("bd*4(5,8,1)")`, and Haiku `x.rarely()` with no function, which validates as a no-op. Use the listening page and its ratings for that.
+- **The sound summary lists only 12 drum machines in full.** For the other ~60 banks the model knows the names but not their sounds, so `.bank("casiovl1")` with `oh` comes back as an `unknown-sample` retry.
+- **`src/generated/scope.json` and `sounds.json` are snapshots.** After a Strudel upgrade, run `await __shaper.saveScope()` in the dev page, then `npm run build:reference`; the reference test fails until the checked-in reference matches.
+- **The eval measures from the proxy app in-process**, so browser → proxy network time isn't included. Locally that is about 1 ms; the browser numbers seen in testing (first card 1.0–1.6 s) match.
+- **`silence()` was in the first reference** as if it were a function (it's a value), and parallel Haiku used it twice on "mute the pad" (`silence is not a function`, then retried). The reference now has a hand-written `silence` entry, and the signals (`sine`, `saw`, `rand`, …) are listed as values (`sine.range(…)`), not as `sine()`; a test checks it. The sweeps above ran before that fix.
+- **Physical ⌘J / ⌘⇧J** (from milestone 2) still haven't been checked by hand.

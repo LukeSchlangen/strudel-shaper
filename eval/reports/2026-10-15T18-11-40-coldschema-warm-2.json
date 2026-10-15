@@ -1,0 +1,297 @@
+{
+ "label": "coldschema-warm-2",
+ "createdAt": "2026-10-15T18:11:40.397Z",
+ "config": {
+  "provider": "claude",
+  "model": "claude-haiku-5-5",
+  "effort": "low",
+  "thinking": "off",
+  "warmup": true,
+  "only": [
+   "drums-kick",
+   "bass-darker",
+   "melody-empty"
+  ],
+  "label": "coldschema-warm-2",
+  "schemaKey": "opts_warm_2_1792087889",
+  "warmupMs": 2057.2846250000002
+ },
+ "soundsTokens": 1053,
+ "referenceTokens": 2414,
+ "results": [
+  {
+   "id": "drums-kick",
+   "bufferId": "drums",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*4\"),\n  s(\"~ sd ~ sd\").bank(\"tr909\"),\n  s(\"hh*8\").gain(0.5),\n  s(\"~ ~ ~ oh\").gain(0.4)\n)",
+   "selection": {
+    "from": 21,
+    "to": 30,
+    "text": "s(\"bd*4\")"
+   },
+   "instruction": "",
+   "firstArrivalMs": 1581.0080830000002,
+   "firstCardMs": 1591.4953329999998,
+   "lastSettledMs": 2132.540167,
+   "totalMs": 2147.19125,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1578.31875,
+    "lastMs": 2126.6731670000004,
+    "totalMs": 2144.719834,
+    "tokens": {
+     "input": 163,
+     "output": 206,
+     "cacheRead": 7670,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.000196
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "offbeat kick pattern",
+       "code": "s(\"bd(3,8)\")",
+       "arrivedMs": 1581.0080830000002
+      }
+     ],
+     "label": "offbeat kick pattern",
+     "code": "s(\"bd(3,8)\")",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "half-time kick",
+       "code": "s(\"bd ~ ~ bd ~ bd ~ ~\").bank(\"tr909\")",
+       "arrivedMs": 1721.4082079999998
+      }
+     ],
+     "label": "half-time kick",
+     "code": "s(\"bd ~ ~ bd ~ bd ~ ~\").bank(\"tr909\")",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "swung kick groove",
+       "code": "s(\"bd*4\").swingBy(1/3, 4).gain(\"1 .8\")",
+       "arrivedMs": 2067.3181670000004
+      }
+     ],
+     "label": "swung kick groove",
+     "code": "s(\"bd*4\").swingBy(1/3, 4).gain(\"1 .8\")",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "filtered kick variation",
+       "code": "s(\"bd*4\").bank(\"tr808\").lpf(\"<800 2000>\")",
+       "arrivedMs": 2128.020625
+      }
+     ],
+     "label": "filtered kick variation",
+     "code": "s(\"bd*4\").bank(\"tr808\").lpf(\"<800 2000>\")",
+     "warnings": [],
+     "retried": false
+    }
+   ]
+  },
+  {
+   "id": "bass-darker",
+   "bufferId": "bass",
+   "buffer": "setcps(0.55)\nstack(\n  s(\"bd*4, ~ cp\"),\n  note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0),\n  s(\"hh*8\").gain(0.4)\n)",
+   "selection": {
+    "from": 41,
+    "to": 119,
+    "text": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0)"
+   },
+   "instruction": "darker",
+   "firstArrivalMs": 1319.7315419999995,
+   "firstCardMs": 1327.0832919999993,
+   "lastSettledMs": 1879.4563749999998,
+   "totalMs": 1917.366,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1318.8688750000001,
+    "lastMs": 1869.2295000000004,
+    "totalMs": 1915.2442500000006,
+    "tokens": {
+     "input": 167,
+     "output": 265,
+     "cacheRead": 7670,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00022590000000000002
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "lower darker filter",
+       "code": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(380).lpq(9).decay(0.2).sustain(0)",
+       "arrivedMs": 1319.7315419999995
+      }
+     ],
+     "label": "lower darker filter",
+     "code": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(380).lpq(9).decay(0.2).sustain(0)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "detuned dark bass",
+       "code": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").detune(0.8).lpf(450).lpq(5).decay(0.18).sustain(0)",
+       "arrivedMs": 1663.945417
+      }
+     ],
+     "label": "detuned dark bass",
+     "code": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").detune(0.8).lpf(450).lpq(5).decay(0.18).sustain(0)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "sub octave growl",
+       "code": "note(\"<c1 c1 ab0 bb0>*4\").s(\"square\").lpf(sine.range(200, 500).slow(4)).lpq(10).decay(0.22).sustain(0)",
+       "arrivedMs": 1870.766917
+      }
+     ],
+     "label": "sub octave growl",
+     "code": "note(\"<c1 c1 ab0 bb0>*4\").s(\"square\").lpf(sine.range(200, 500).slow(4)).lpq(10).decay(0.22).sustain(0)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "melody-empty",
+   "bufferId": "melody",
+   "buffer": "setcps(0.5)\nstack(\n  n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5),\n  note(\"d2 ~ a1 ~\").s(\"sawtooth\").lpf(500),\n  s(\"bd ~ sd ~, hh*8\")\n)",
+   "selection": {
+    "from": 21,
+    "to": 95,
+    "text": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)"
+   },
+   "instruction": "",
+   "firstArrivalMs": 1928.995417000001,
+   "firstCardMs": 1939.6502499999997,
+   "lastSettledMs": 4720.331917,
+   "totalMs": 4720.421917000001,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1927.4178330000004,
+    "lastMs": 3022.4406659999995,
+    "totalMs": 3031.4329580000003,
+    "tokens": {
+     "input": 195,
+     "output": 419,
+     "cacheRead": 7670,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.0003057
+   },
+   "retries": [
+    {
+     "slot": 4,
+     "reason": "query",
+     "message": "Cannot read properties of undefined (reading 'value')",
+     "code": "n(\"<0 3 4 5>\").scale(\"D:dorian\").chord(\"<Dm7 Gm7 Am7 Dm7>\").voicing().arp(\"up\").s(\"square\").lpf(1800).gain(0.4)"
+    }
+   ],
+   "drops": [
+    {
+     "slot": 4,
+     "reason": "query",
+     "message": "Cannot read properties of undefined (reading 'value')",
+     "code": "n(\"<0 3 4 5>\").scale(\"D:dorian\").s(\"square\").arp(\"up\").lpf(1800).gain(0.4)"
+    }
+   ],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "octave jump melody",
+       "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").add(\"<0 0 0 12>\").s(\"square\").lpf(1800).gain(0.5)",
+       "arrivedMs": 1928.995417000001
+      }
+     ],
+     "label": "octave jump melody",
+     "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").add(\"<0 0 0 12>\").s(\"square\").lpf(1800).gain(0.5)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "syncopated pluck",
+       "code": "n(\"0 ~ 2 4 <5 7> ~ 4 2\").scale(\"D:dorian\").s(\"triangle\").lpf(2200).gain(0.45).off(1/8, x => x.add(2).gain(0.25))",
+       "arrivedMs": 2293.232667000001
+      }
+     ],
+     "label": "syncopated pluck",
+     "code": "n(\"0 ~ 2 4 <5 7> ~ 4 2\").scale(\"D:dorian\").s(\"triangle\").lpf(2200).gain(0.45).off(1/8, x => x.add(2).gain(0.25))",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "filter sweep lead",
+       "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"sawtooth\").lpf(sine.range(400, 2400).slow(4)).lpq(6).gain(0.45)",
+       "arrivedMs": 2621.314792
+      }
+     ],
+     "label": "filter sweep lead",
+     "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"sawtooth\").lpf(sine.range(400, 2400).slow(4)).lpq(6).gain(0.45)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "dropped",
+     "attempts": [
+      {
+       "label": "arpeggiated chords",
+       "code": "n(\"<0 3 4 5>\").scale(\"D:dorian\").chord(\"<Dm7 Gm7 Am7 Dm7>\").voicing().arp(\"up\").s(\"square\").lpf(1800).gain(0.4)",
+       "arrivedMs": 3023.5373339999996,
+       "outcome": "retried: query"
+      },
+      {
+       "label": "arpeggiated dorian chords",
+       "code": "n(\"<0 3 4 5>\").scale(\"D:dorian\").s(\"square\").arp(\"up\").lpf(1800).gain(0.4)",
+       "arrivedMs": 4714.351750000001
+      }
+     ],
+     "drop": {
+      "reason": "query",
+      "message": "Cannot read properties of undefined (reading 'value')"
+     }
+    }
+   ]
+  }
+ ]
+}

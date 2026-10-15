@@ -1,0 +1,1787 @@
+{
+ "label": "haiku-5-5-adaptive-medium-single",
+ "createdAt": "2026-10-15T18:05:21.535Z",
+ "config": {
+  "provider": "claude",
+  "model": "claude-haiku-5-5",
+  "effort": "medium",
+  "thinking": "adaptive",
+  "warmup": false
+ },
+ "soundsTokens": 1053,
+ "referenceTokens": 2414,
+ "results": [
+  {
+   "id": "drums-kick",
+   "bufferId": "drums",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*4\"),\n  s(\"~ sd ~ sd\").bank(\"tr909\"),\n  s(\"hh*8\").gain(0.5),\n  s(\"~ ~ ~ oh\").gain(0.4)\n)",
+   "selection": {
+    "from": 21,
+    "to": 30,
+    "text": "s(\"bd*4\")"
+   },
+   "instruction": "",
+   "firstArrivalMs": 2916.4114999999997,
+   "firstCardMs": 2926.400917,
+   "lastSettledMs": 3532.4058339999997,
+   "totalMs": 3544.6523749999997,
+   "stats": {
+    "calls": 1,
+    "firstMs": 2911.607458,
+    "lastMs": 3522.4788329999997,
+    "totalMs": 3540.640083,
+    "tokens": {
+     "input": 163,
+     "output": 579,
+     "cacheRead": 0,
+     "cacheWrite": 7649
+    },
+    "costUsd": 0.001261925
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "euclidean kick pattern",
+       "code": "s(\"bd(5,8)\")",
+       "arrivedMs": 2916.4114999999997
+      }
+     ],
+     "label": "euclidean kick pattern",
+     "code": "s(\"bd(5,8)\")",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "syncopated kick with ghosts",
+       "code": "s(\"bd [~ bd] bd*2 [~ bd]\").gain(\"1 .6 .9 .6\")",
+       "arrivedMs": 3176.0667089999997
+      }
+     ],
+     "label": "syncopated kick with ghosts",
+     "code": "s(\"bd [~ bd] bd*2 [~ bd]\").gain(\"1 .6 .9 .6\")",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "808 kick with filter",
+       "code": "s(\"bd*4\").bank(\"tr808\").lpf(sine.range(150, 900).slow(8))",
+       "arrivedMs": 3360.493
+      }
+     ],
+     "label": "808 kick with filter",
+     "code": "s(\"bd*4\").bank(\"tr808\").lpf(sine.range(150, 900).slow(8))",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "kick with fill on",
+       "code": "s(\"bd*4\").lastOf(4, x => x.fast(2))",
+       "arrivedMs": 3525.314375
+      }
+     ],
+     "label": "kick with fill on",
+     "code": "s(\"bd*4\").lastOf(4, x => x.fast(2))",
+     "warnings": [],
+     "retried": false
+    }
+   ]
+  },
+  {
+   "id": "drums-hats-busier",
+   "bufferId": "drums",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*4\"),\n  s(\"~ sd ~ sd\").bank(\"tr909\"),\n  s(\"hh*8\").gain(0.5),\n  s(\"~ ~ ~ oh\").gain(0.4)\n)",
+   "selection": {
+    "from": 66,
+    "to": 85,
+    "text": "s(\"hh*8\").gain(0.5)"
+   },
+   "instruction": "busier in the second half",
+   "firstArrivalMs": 5987.8597500000005,
+   "firstCardMs": 5994.743083,
+   "lastSettledMs": 6365.7167500000005,
+   "totalMs": 6386.245958,
+   "stats": {
+    "calls": 1,
+    "firstMs": 5986.872625,
+    "lastMs": 6356.009708,
+    "totalMs": 6384.596833,
+    "tokens": {
+     "input": 154,
+     "output": 1232,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00070789
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "double time second half",
+       "code": "s(\"hh*8\").gain(0.5).when(\"<0 0 1 1>\", x=>x.fast(2))",
+       "arrivedMs": 5987.8597500000005
+      }
+     ],
+     "label": "double time second half",
+     "code": "s(\"hh*8\").gain(0.5).when(\"<0 0 1 1>\", x=>x.fast(2))",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "ratchet hats second half",
+       "code": "s(\"hh*8\").gain(0.5).when(\"<0 0 1 1>\", x=>x.ply(2))",
+       "arrivedMs": 6169.4547919999995
+      }
+     ],
+     "label": "ratchet hats second half",
+     "code": "s(\"hh*8\").gain(0.5).when(\"<0 0 1 1>\", x=>x.ply(2))",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "ghost offbeat hats",
+       "code": "s(\"hh*8\").gain(0.5).when(\"<0 0 1 1>\", x=>x.off(1/16, y=>y.gain(0.25)))",
+       "arrivedMs": 6357.608875000001
+      }
+     ],
+     "label": "ghost offbeat hats",
+     "code": "s(\"hh*8\").gain(0.5).when(\"<0 0 1 1>\", x=>x.off(1/16, y=>y.gain(0.25)))",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "drums-snare-call",
+   "bufferId": "drums",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*4\"),\n  s(\"~ sd ~ sd\").bank(\"tr909\"),\n  s(\"hh*8\").gain(0.5),\n  s(\"~ ~ ~ oh\").gain(0.4)\n)",
+   "selection": {
+    "from": 34,
+    "to": 62,
+    "text": "s(\"~ sd ~ sd\").bank(\"tr909\")"
+   },
+   "instruction": "call and response with the kick",
+   "firstArrivalMs": 4252.218499999999,
+   "firstCardMs": 4260.515165999999,
+   "lastSettledMs": 4810.20025,
+   "totalMs": 4835.942290999999,
+   "stats": {
+    "calls": 1,
+    "firstMs": 4250.863792,
+    "lastMs": 4800.581709,
+    "totalMs": 4834.627542,
+    "tokens": {
+     "input": 154,
+     "output": 905,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00054439
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "snare answers kick",
+       "code": "s(\"~ sd ~ [sd sd]\").bank(\"tr909\")",
+       "arrivedMs": 4252.218499999999
+      }
+     ],
+     "label": "snare answers kick",
+     "code": "s(\"~ sd ~ [sd sd]\").bank(\"tr909\")",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "alternating call and response",
+       "code": "s(\"<[~ sd ~ sd] [~ ~ sd sd]>\").bank(\"tr909\")",
+       "arrivedMs": 4415.791458
+      }
+     ],
+     "label": "alternating call and response",
+     "code": "s(\"<[~ sd ~ sd] [~ ~ sd sd]>\").bank(\"tr909\")",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "ghost snare response",
+       "code": "s(\"~ sd ~ [sd sd?0.4]\").bank(\"tr909\").gain(\"1 .8 1 .5\")",
+       "arrivedMs": 4642.441416
+      }
+     ],
+     "label": "ghost snare response",
+     "code": "s(\"~ sd ~ [sd sd?0.4]\").bank(\"tr909\").gain(\"1 .8 1 .5\")",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "clap reply on offbeats",
+       "code": "s(\"~ cp ~ [cp sd]\").bank(\"tr909\")",
+       "arrivedMs": 4802.668582999999
+      }
+     ],
+     "label": "clap reply on offbeats",
+     "code": "s(\"~ cp ~ [cp sd]\").bank(\"tr909\")",
+     "warnings": [],
+     "retried": false
+    }
+   ]
+  },
+  {
+   "id": "drums-drop-hats",
+   "bufferId": "drums",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*4\"),\n  s(\"~ sd ~ sd\").bank(\"tr909\"),\n  s(\"hh*8\").gain(0.5),\n  s(\"~ ~ ~ oh\").gain(0.4)\n)",
+   "selection": {
+    "from": 66,
+    "to": 85,
+    "text": "s(\"hh*8\").gain(0.5)"
+   },
+   "instruction": "drop the hats",
+   "firstArrivalMs": 2629.0045840000002,
+   "firstCardMs": 2761.9136249999992,
+   "lastSettledMs": 5310.930417000001,
+   "totalMs": 5310.9924169999995,
+   "stats": {
+    "calls": 1,
+    "firstMs": 2628.1368330000005,
+    "lastMs": 3058.7208329999994,
+    "totalMs": 3059.412457999999,
+    "tokens": {
+     "input": 153,
+     "output": 582,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00038279
+   },
+   "retries": [
+    {
+     "slot": 1,
+     "reason": "eval",
+     "message": "silence is not a function",
+     "code": "silence()"
+    }
+   ],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "mute hats entirely",
+       "code": "silence()",
+       "arrivedMs": 2629.0045840000002,
+       "outcome": "retried: eval"
+      },
+      {
+       "label": "drop hats",
+       "code": "s(\"~ ~ ~ ~ ~ ~ ~ ~\").gain(0.5)",
+       "arrivedMs": 5302.343999999999
+      }
+     ],
+     "label": "drop hats",
+     "code": "s(\"~ ~ ~ ~ ~ ~ ~ ~\").gain(0.5)",
+     "warnings": [
+      "empty"
+     ],
+     "retried": true
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "sparse offbeat hats",
+       "code": "s(\"~ hh ~ hh\").gain(0.5)",
+       "arrivedMs": 2753.9259170000023
+      }
+     ],
+     "label": "sparse offbeat hats",
+     "code": "s(\"~ hh ~ hh\").gain(0.5)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "hats drop every other",
+       "code": "s(\"<hh*8 ~>\").gain(0.5)",
+       "arrivedMs": 2884.9210839999996
+      }
+     ],
+     "label": "hats drop every other",
+     "code": "s(\"<hh*8 ~>\").gain(0.5)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "quiet sparse closed hats",
+       "code": "s(\"hh*2 ~ hh ~\").gain(0.3)",
+       "arrivedMs": 3059.5175
+      }
+     ],
+     "label": "quiet sparse closed hats",
+     "code": "s(\"hh*2 ~ hh ~\").gain(0.3)",
+     "warnings": [],
+     "retried": false
+    }
+   ]
+  },
+  {
+   "id": "bass-empty",
+   "bufferId": "bass",
+   "buffer": "setcps(0.55)\nstack(\n  s(\"bd*4, ~ cp\"),\n  note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0),\n  s(\"hh*8\").gain(0.4)\n)",
+   "selection": {
+    "from": 41,
+    "to": 119,
+    "text": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0)"
+   },
+   "instruction": "",
+   "firstArrivalMs": 5248.563875,
+   "firstCardMs": 5255.225374999998,
+   "lastSettledMs": 6016.221750000001,
+   "totalMs": 6033.812332999998,
+   "stats": {
+    "calls": 1,
+    "firstMs": 5247.903374999998,
+    "lastMs": 6007.913375,
+    "totalMs": 6032.61375,
+    "tokens": {
+     "input": 181,
+     "output": 1290,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00073959
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "euclidean bass pulse",
+       "code": "note(\"<c2 c2 ab1 bb1>(5,8)\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0)",
+       "arrivedMs": 5248.563875
+      }
+     ],
+     "label": "euclidean bass pulse",
+     "code": "note(\"<c2 c2 ab1 bb1>(5,8)\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "slow filter sweep",
+       "code": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(sine.range(300,1200).slow(4)).lpq(6).decay(0.15).sustain(0)",
+       "arrivedMs": 5494.856832999998
+      }
+     ],
+     "label": "slow filter sweep",
+     "code": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(sine.range(300,1200).slow(4)).lpq(6).decay(0.15).sustain(0)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "octave jump bass",
+       "code": "note(\"<c2 c2 ab1 bb1>*4\").add(note(\"<0 0 12 0>\")).s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0)",
+       "arrivedMs": 5744.2020410000005
+      }
+     ],
+     "label": "octave jump bass",
+     "code": "note(\"<c2 c2 ab1 bb1>*4\").add(note(\"<0 0 12 0>\")).s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "syncopated gated stabs",
+       "code": "note(\"<c2 c2 ab1 bb1>*4\").struct(\"x ~ [x x] ~ x\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0)",
+       "arrivedMs": 6008.522790999999
+      }
+     ],
+     "label": "syncopated gated stabs",
+     "code": "note(\"<c2 c2 ab1 bb1>*4\").struct(\"x ~ [x x] ~ x\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0)",
+     "warnings": [],
+     "retried": false
+    }
+   ]
+  },
+  {
+   "id": "bass-darker",
+   "bufferId": "bass",
+   "buffer": "setcps(0.55)\nstack(\n  s(\"bd*4, ~ cp\"),\n  note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0),\n  s(\"hh*8\").gain(0.4)\n)",
+   "selection": {
+    "from": 41,
+    "to": 119,
+    "text": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0)"
+   },
+   "instruction": "darker",
+   "firstArrivalMs": 2606.368000000002,
+   "firstCardMs": 2612.4028340000004,
+   "lastSettledMs": 3063.626542000002,
+   "totalMs": 3063.985834000003,
+   "stats": {
+    "calls": 1,
+    "firstMs": 2604.838458000002,
+    "lastMs": 3055.1307500000003,
+    "totalMs": 3062.560958000002,
+    "tokens": {
+     "input": 167,
+     "output": 667,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00042669
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "sub bass drop",
+       "code": "note(\"<c1 c1 ab0 bb0>*4\").s(\"sine\").lpf(300).lpq(4).decay(0.2).sustain(0)",
+       "arrivedMs": 2606.368000000002
+      }
+     ],
+     "label": "sub bass drop",
+     "code": "note(\"<c1 c1 ab0 bb0>*4\").s(\"sine\").lpf(300).lpq(4).decay(0.2).sustain(0)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "closed filter growl",
+       "code": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(sine.range(180, 450).slow(4)).lpq(10).decay(0.15).sustain(0)",
+       "arrivedMs": 2810.0914589999993
+      }
+     ],
+     "label": "closed filter growl",
+     "code": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(sine.range(180, 450).slow(4)).lpq(10).decay(0.15).sustain(0)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "gritty dark triangle",
+       "code": "note(\"<c2 c2 ab1 g1>*4\").s(\"triangle\").lpf(400).lpq(6).distort(0.2).decay(0.15).sustain(0)",
+       "arrivedMs": 3056.529584
+      }
+     ],
+     "label": "gritty dark triangle",
+     "code": "note(\"<c2 c2 ab1 g1>*4\").s(\"triangle\").lpf(400).lpq(6).distort(0.2).decay(0.15).sustain(0)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "bass-halftime",
+   "bufferId": "bass",
+   "buffer": "setcps(0.55)\nstack(\n  s(\"bd*4, ~ cp\"),\n  note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0),\n  s(\"hh*8\").gain(0.4)\n)",
+   "selection": {
+    "from": 41,
+    "to": 119,
+    "text": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0)"
+   },
+   "instruction": "half-time feel",
+   "firstArrivalMs": 5482.140874999997,
+   "firstCardMs": 5489.088457999998,
+   "lastSettledMs": 5994.176707999999,
+   "totalMs": 6000.788542000002,
+   "stats": {
+    "calls": 1,
+    "firstMs": 5481.09,
+    "lastMs": 5991.722540999999,
+    "totalMs": 5999.950249999998,
+    "tokens": {
+     "input": 170,
+     "output": 1235,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00071099
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "slow root pulse",
+       "code": "note(\"<c2 c2 ab1 bb1>*2\").slow(2).s(\"sawtooth\").lpf(600).lpq(6).decay(0.3).sustain(0)",
+       "arrivedMs": 5482.140874999997
+      }
+     ],
+     "label": "slow root pulse",
+     "code": "note(\"<c2 c2 ab1 bb1>*2\").slow(2).s(\"sawtooth\").lpf(600).lpq(6).decay(0.3).sustain(0)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "sparse half-time hits",
+       "code": "note(\"<c2 c2 ab1 bb1>*2\").struct(\"x ~ ~ x\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.3).sustain(0)",
+       "arrivedMs": 5709.877124999999
+      }
+     ],
+     "label": "sparse half-time hits",
+     "code": "note(\"<c2 c2 ab1 bb1>*2\").struct(\"x ~ ~ x\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.3).sustain(0)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "half-time filter swell",
+       "code": "note(\"<c2 c2 ab1 bb1>\").slow(2).s(\"sawtooth\").lpf(sine.range(300, 900).slow(4)).lpq(6).decay(0.4).sustain(0)",
+       "arrivedMs": 5992.498082999999
+      }
+     ],
+     "label": "half-time filter swell",
+     "code": "note(\"<c2 c2 ab1 bb1>\").slow(2).s(\"sawtooth\").lpf(sine.range(300, 900).slow(4)).lpq(6).decay(0.4).sustain(0)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "bass-remove-hats",
+   "bufferId": "bass",
+   "buffer": "setcps(0.55)\nstack(\n  s(\"bd*4, ~ cp\"),\n  note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0),\n  s(\"hh*8\").gain(0.4)\n)",
+   "selection": {
+    "from": 123,
+    "to": 142,
+    "text": "s(\"hh*8\").gain(0.4)"
+   },
+   "instruction": "remove the hats",
+   "firstArrivalMs": 3800.2287090000027,
+   "firstCardMs": 4119.652374999998,
+   "lastSettledMs": 6039.730750000002,
+   "totalMs": 6039.838750000003,
+   "stats": {
+    "calls": 1,
+    "firstMs": 3799.311791,
+    "lastMs": 4216.842249999994,
+    "totalMs": 4218.122124999994,
+    "tokens": {
+     "input": 169,
+     "output": 761,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00047389
+   },
+   "retries": [
+    {
+     "slot": 1,
+     "reason": "eval",
+     "message": "silence is not a function",
+     "code": "silence()"
+    },
+    {
+     "slot": 2,
+     "reason": "eval",
+     "message": "silence is not a function",
+     "code": "silence().lastOf(4, x => s(\"hh*8\").gain(0.4))"
+    }
+   ],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "silence hats",
+       "code": "silence()",
+       "arrivedMs": 3800.2287090000027,
+       "outcome": "retried: eval"
+      },
+      {
+       "label": "remove hats",
+       "code": "s(\"~\")",
+       "arrivedMs": 5839.8791249999995
+      }
+     ],
+     "label": "remove hats",
+     "code": "s(\"~\")",
+     "warnings": [
+      "empty"
+     ],
+     "retried": true
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "hats only last cycle",
+       "code": "silence().lastOf(4, x => s(\"hh*8\").gain(0.4))",
+       "arrivedMs": 3946.307166999999,
+       "outcome": "retried: eval"
+      },
+      {
+       "label": "silent hats",
+       "code": "s(\"~\").gain(0.4)",
+       "arrivedMs": 6033.170750000005
+      }
+     ],
+     "label": "silent hats",
+     "code": "s(\"~\").gain(0.4)",
+     "warnings": [
+      "empty"
+     ],
+     "retried": true
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "hats every fourth cycle",
+       "code": "s(\"hh*8\").gain(0.4).mask(\"<0 0 0 1>\")",
+       "arrivedMs": 4110.089749999999
+      }
+     ],
+     "label": "hats every fourth cycle",
+     "code": "s(\"hh*8\").gain(0.4).mask(\"<0 0 0 1>\")",
+     "warnings": [
+      "empty"
+     ],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "sparse quiet hats",
+       "code": "s(\"hh*2\").gain(0.2)",
+       "arrivedMs": 4217.471250000002
+      }
+     ],
+     "label": "sparse quiet hats",
+     "code": "s(\"hh*2\").gain(0.2)",
+     "warnings": [],
+     "retried": false
+    }
+   ]
+  },
+  {
+   "id": "chords-empty",
+   "bufferId": "chords",
+   "buffer": "setcps(0.45)\nstack(\n  chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano1\").room(0.3),\n  note(\"<c2 f2 bb1 eb2>\").s(\"triangle\").gain(0.8),\n  s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\")\n)",
+   "selection": {
+    "from": 22,
+    "to": 87,
+    "text": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano1\").room(0.3)"
+   },
+   "instruction": "",
+   "firstArrivalMs": 3089.5592079999988,
+   "firstCardMs": 3097.5544169999994,
+   "lastSettledMs": 6556.1234170000025,
+   "totalMs": 6556.165083,
+   "stats": {
+    "calls": 1,
+    "firstMs": 3088.7779999999984,
+    "lastMs": 4028.9180419999975,
+    "totalMs": 4034.935749999997,
+    "tokens": {
+     "input": 208,
+     "output": 829,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.0005117899999999999
+   },
+   "retries": [
+    {
+     "slot": 2,
+     "reason": "query",
+     "message": "Cannot read properties of undefined (reading 'value')",
+     "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().arp(\"<up down>\").fast(2).s(\"gm_epiano1\").room(0.3)"
+    }
+   ],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "offbeat stabs",
+       "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().struct(\"~ x ~ x\").s(\"gm_epiano1\").room(0.3)",
+       "arrivedMs": 3089.5592079999988
+      }
+     ],
+     "label": "offbeat stabs",
+     "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().struct(\"~ x ~ x\").s(\"gm_epiano1\").room(0.3)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "up down arpeggio",
+       "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().arp(\"<up down>\").fast(2).s(\"gm_epiano1\").room(0.3)",
+       "arrivedMs": 3377.019416999996,
+       "outcome": "retried: query"
+      },
+      {
+       "label": "slow stereo drift",
+       "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano1\").room(0.3).pan(sine.slow(4))",
+       "arrivedMs": 6548.762332999999
+      }
+     ],
+     "label": "slow stereo drift",
+     "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano1\").room(0.3).pan(sine.slow(4))",
+     "warnings": [],
+     "retried": true
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "slow filter sweep and",
+       "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano1\").lpf(sine.range(600, 2500).slow(4)).pan(sine.slow(3)).room(0.3)",
+       "arrivedMs": 3681.7214999999997
+      }
+     ],
+     "label": "slow filter sweep and",
+     "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano1\").lpf(sine.range(600, 2500).slow(4)).pan(sine.slow(3)).room(0.3)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "electric piano swap",
+       "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano2\").every(4, x => x.add(note(12))).room(0.4)",
+       "arrivedMs": 4029.631874999999
+      }
+     ],
+     "label": "electric piano swap",
+     "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano2\").every(4, x => x.add(note(12))).room(0.4)",
+     "warnings": [],
+     "retried": false
+    }
+   ]
+  },
+  {
+   "id": "chords-stabs",
+   "bufferId": "chords",
+   "buffer": "setcps(0.45)\nstack(\n  chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano1\").room(0.3),\n  note(\"<c2 f2 bb1 eb2>\").s(\"triangle\").gain(0.8),\n  s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\")\n)",
+   "selection": {
+    "from": 22,
+    "to": 87,
+    "text": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano1\").room(0.3)"
+   },
+   "instruction": "more rhythmic stabs",
+   "firstArrivalMs": 3877.046792000001,
+   "firstCardMs": 3883.7975829999996,
+   "lastSettledMs": 4785.079208000003,
+   "totalMs": 4798.833542,
+   "stats": {
+    "calls": 1,
+    "firstMs": 3876.2681250000023,
+    "lastMs": 4774.308667000005,
+    "totalMs": 4797.990958000002,
+    "tokens": {
+     "input": 201,
+     "output": 949,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00057109
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "syncopated epiano stabs",
+       "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().struct(\"x ~ ~ x ~ x ~ ~\").s(\"gm_epiano1\").room(0.3)",
+       "arrivedMs": 3877.046792000001
+      }
+     ],
+     "label": "syncopated epiano stabs",
+     "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().struct(\"x ~ ~ x ~ x ~ ~\").s(\"gm_epiano1\").room(0.3)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "euclidean stab pulse",
+       "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().euclid(5,8).s(\"gm_epiano1\").room(0.3)",
+       "arrivedMs": 4122.810167000003
+      }
+     ],
+     "label": "euclidean stab pulse",
+     "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().euclid(5,8).s(\"gm_epiano1\").room(0.3)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "offbeat short chords",
+       "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().struct(\"~ x ~ x ~ x ~ ~\").s(\"gm_epiano1\").release(.1).room(0.3)",
+       "arrivedMs": 4409.735625000001
+      }
+     ],
+     "label": "offbeat short chords",
+     "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().struct(\"~ x ~ x ~ x ~ ~\").s(\"gm_epiano1\").release(.1).room(0.3)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "doubled stab bursts",
+       "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().struct(\"x*2 ~ x ~ [~ x]\").s(\"gm_epiano1\").gain(\"1 .6\").room(0.3)",
+       "arrivedMs": 4774.990582999999
+      }
+     ],
+     "label": "doubled stab bursts",
+     "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().struct(\"x*2 ~ x ~ [~ x]\").s(\"gm_epiano1\").gain(\"1 .6\").room(0.3)",
+     "warnings": [],
+     "retried": false
+    }
+   ]
+  },
+  {
+   "id": "chords-walk",
+   "bufferId": "chords",
+   "buffer": "setcps(0.45)\nstack(\n  chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano1\").room(0.3),\n  note(\"<c2 f2 bb1 eb2>\").s(\"triangle\").gain(0.8),\n  s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\")\n)",
+   "selection": {
+    "from": 91,
+    "to": 138,
+    "text": "note(\"<c2 f2 bb1 eb2>\").s(\"triangle\").gain(0.8)"
+   },
+   "instruction": "walk between the roots",
+   "firstArrivalMs": 7820.583666999999,
+   "firstCardMs": 7828.171125000001,
+   "lastSettledMs": 8353.662041999996,
+   "totalMs": 8397.706417000001,
+   "stats": {
+    "calls": 1,
+    "firstMs": 7820.116790999993,
+    "lastMs": 8346.949957999997,
+    "totalMs": 8397.123165999998,
+    "tokens": {
+     "input": 198,
+     "output": 1791,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00099179
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "passing tones to roots",
+       "code": "note(\"<[c2 d2 eb2 f2] [f2 g2 ab2 bb1] [bb1 c2 d2 eb2] [eb2 f2 g2 bb1]>\").s(\"triangle\").gain(0.8)",
+       "arrivedMs": 7820.583666999999
+      }
+     ],
+     "label": "passing tones to roots",
+     "code": "note(\"<[c2 d2 eb2 f2] [f2 g2 ab2 bb1] [bb1 c2 d2 eb2] [eb2 f2 g2 bb1]>\").s(\"triangle\").gain(0.8)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "chromatic approach from below",
+       "code": "note(\"<[c2 b1 bb1 c2] [f2 e2 eb2 f2] [bb1 a1 ab1 bb1] [eb2 d2 db2 eb2]>\").s(\"triangle\").gain(0.8)",
+       "arrivedMs": 8107.804499999998
+      }
+     ],
+     "label": "chromatic approach from below",
+     "code": "note(\"<[c2 b1 bb1 c2] [f2 e2 eb2 f2] [bb1 a1 ab1 bb1] [eb2 d2 db2 eb2]>\").s(\"triangle\").gain(0.8)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "chord tone walk",
+       "code": "note(\"<[c2 eb2 g2 bb1] [f2 ab2 c2 eb2] [bb1 d2 f2 ab2] [eb2 g2 bb2 d2]>\").s(\"triangle\").gain(0.8)",
+       "arrivedMs": 8347.426291999996
+      }
+     ],
+     "label": "chord tone walk",
+     "code": "note(\"<[c2 eb2 g2 bb1] [f2 ab2 c2 eb2] [bb1 d2 f2 ab2] [eb2 g2 bb2 d2]>\").s(\"triangle\").gain(0.8)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "chords-drums",
+   "bufferId": "chords",
+   "buffer": "setcps(0.45)\nstack(\n  chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano1\").room(0.3),\n  note(\"<c2 f2 bb1 eb2>\").s(\"triangle\").gain(0.8),\n  s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\")\n)",
+   "selection": {
+    "from": 142,
+    "to": 182,
+    "text": "s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\")"
+   },
+   "instruction": "",
+   "firstArrivalMs": 4463.872542000005,
+   "firstCardMs": 4468.543958000002,
+   "lastSettledMs": 8308.484957999994,
+   "totalMs": 8308.522208000002,
+   "stats": {
+    "calls": 1,
+    "firstMs": 4463.345875000006,
+    "lastMs": 5240.185583999999,
+    "totalMs": 5243.168291999995,
+    "tokens": {
+     "input": 207,
+     "output": 1106,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00065019
+   },
+   "retries": [
+    {
+     "slot": 4,
+     "reason": "query",
+     "message": "cannot parse as numeral: \"bd\"",
+     "code": "s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\").every(4, x => x.fast(2).add(s(\"rim\")))"
+    }
+   ],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "euclidean kick and clap",
+       "code": "s(\"bd(3,8), ~ cp\").bank(\"rolandtr808\")",
+       "arrivedMs": 4463.872542000005
+      }
+     ],
+     "label": "euclidean kick and clap",
+     "code": "s(\"bd(3,8), ~ cp\").bank(\"rolandtr808\")",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "ghost hats under groove",
+       "code": "s(\"bd ~ ~ bd, ~ sd, [~ hh]*4\").bank(\"rolandtr808\").gain(\"1 .6 .8 .5\")",
+       "arrivedMs": 5077.258416999997
+      }
+     ],
+     "label": "ghost hats under groove",
+     "code": "s(\"bd ~ ~ bd, ~ sd, [~ hh]*4\").bank(\"rolandtr808\").gain(\"1 .6 .8 .5\")",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "syncopated kick and snare",
+       "code": "s(\"bd ~ bd ~ ~ bd ~ ~, ~ sd ~ ~ sd ~ sd ~\").bank(\"rolandtr808\")",
+       "arrivedMs": 5099.354832999998
+      }
+     ],
+     "label": "syncopated kick and snare",
+     "code": "s(\"bd ~ bd ~ ~ bd ~ ~, ~ sd ~ ~ sd ~ sd ~\").bank(\"rolandtr808\")",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "fill every fourth cycle",
+       "code": "s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\").every(4, x => x.fast(2).add(s(\"rim\")))",
+       "arrivedMs": 5240.7649579999925,
+       "outcome": "retried: query"
+      },
+      {
+       "label": "fill every fourth cycle",
+       "code": "s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\").every(4, x => x.fast(2))",
+       "arrivedMs": 8300.469416999993
+      }
+     ],
+     "label": "fill every fourth cycle",
+     "code": "s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\").every(4, x => x.fast(2))",
+     "warnings": [],
+     "retried": true
+    }
+   ]
+  },
+  {
+   "id": "melody-empty",
+   "bufferId": "melody",
+   "buffer": "setcps(0.5)\nstack(\n  n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5),\n  note(\"d2 ~ a1 ~\").s(\"sawtooth\").lpf(500),\n  s(\"bd ~ sd ~, hh*8\")\n)",
+   "selection": {
+    "from": 21,
+    "to": 95,
+    "text": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)"
+   },
+   "instruction": "",
+   "firstArrivalMs": 3748.6190840000054,
+   "firstCardMs": 3758.9632090000086,
+   "lastSettledMs": 4578.542459000004,
+   "totalMs": 4592.230750000002,
+   "stats": {
+    "calls": 1,
+    "firstMs": 3747.6552920000104,
+    "lastMs": 4568.313667000009,
+    "totalMs": 4591.221792000011,
+    "tokens": {
+     "input": 195,
+     "output": 976,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00058399
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "syncopated lead rhythm",
+       "code": "n(\"0 2 [4 5] <5 7> 4 2 ~ 0\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+       "arrivedMs": 3748.6190840000054
+      }
+     ],
+     "label": "syncopated lead rhythm",
+     "code": "n(\"0 2 [4 5] <5 7> 4 2 ~ 0\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "swept filter timbre",
+       "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"sawtooth\").lpf(sine.range(600, 2400).slow(4)).gain(0.4)",
+       "arrivedMs": 3996.83425
+      }
+     ],
+     "label": "swept filter timbre",
+     "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"sawtooth\").lpf(sine.range(600, 2400).slow(4)).gain(0.4)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "fifth octave echo",
+       "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").off(1/8, x => x.add(7).gain(0.3)).s(\"square\").lpf(1800).gain(0.4)",
+       "arrivedMs": 4301.1726250000065
+      }
+     ],
+     "label": "fifth octave echo",
+     "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").off(1/8, x => x.add(7).gain(0.3)).s(\"square\").lpf(1800).gain(0.4)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "panning room melody",
+       "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5).pan(sine.slow(2)).room(0.3)",
+       "arrivedMs": 4569.213417000006
+      }
+     ],
+     "label": "panning room melody",
+     "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5).pan(sine.slow(2)).room(0.3)",
+     "warnings": [],
+     "retried": false
+    }
+   ]
+  },
+  {
+   "id": "melody-call",
+   "bufferId": "melody",
+   "buffer": "setcps(0.5)\nstack(\n  n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5),\n  note(\"d2 ~ a1 ~\").s(\"sawtooth\").lpf(500),\n  s(\"bd ~ sd ~, hh*8\")\n)",
+   "selection": {
+    "from": 21,
+    "to": 95,
+    "text": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)"
+   },
+   "instruction": "call and response with the kick",
+   "firstArrivalMs": 8652.456250000003,
+   "firstCardMs": 8659.650542000003,
+   "lastSettledMs": 9133.517084000006,
+   "totalMs": 9168.687749999997,
+   "stats": {
+    "calls": 1,
+    "firstMs": 8651.813167,
+    "lastMs": 9124.503959000009,
+    "totalMs": 9168.120959000007,
+    "tokens": {
+     "input": 186,
+     "output": 1706,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.0009480900000000001
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "answer in kick gaps",
+       "code": "n(\"~ 0 2 4 ~ <5 7> 4 2\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+       "arrivedMs": 8652.456250000003
+      }
+     ],
+     "label": "answer in kick gaps",
+     "code": "n(\"~ 0 2 4 ~ <5 7> 4 2\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "call then answer halves",
+       "code": "n(\"<[0 2 4 <5 7>] [~ 4 2 0]>\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+       "arrivedMs": 8855.972209
+      }
+     ],
+     "label": "call then answer halves",
+     "code": "n(\"<[0 2 4 <5 7>] [~ 4 2 0]>\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "triangle reply on offbeats",
+       "code": "n(\"0 ~ 4 ~ <5 7> ~ 2 ~\").scale(\"D:dorian\").s(\"triangle\").lpf(1800).gain(0.5)",
+       "arrivedMs": 9124.979166999998
+      }
+     ],
+     "label": "triangle reply on offbeats",
+     "code": "n(\"0 ~ 4 ~ <5 7> ~ 2 ~\").scale(\"D:dorian\").s(\"triangle\").lpf(1800).gain(0.5)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "melody-syncopated",
+   "bufferId": "melody",
+   "buffer": "setcps(0.5)\nstack(\n  n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5),\n  note(\"d2 ~ a1 ~\").s(\"sawtooth\").lpf(500),\n  s(\"bd ~ sd ~, hh*8\")\n)",
+   "selection": {
+    "from": 21,
+    "to": 95,
+    "text": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)"
+   },
+   "instruction": "more syncopated",
+   "firstArrivalMs": 7332.732208999994,
+   "firstCardMs": 7343.298792000001,
+   "lastSettledMs": 7865.784583999994,
+   "totalMs": 7918.468833999999,
+   "stats": {
+    "calls": 1,
+    "firstMs": 7331.840708000003,
+    "lastMs": 7852.042333000005,
+    "totalMs": 7917.225833000004,
+    "tokens": {
+     "input": 184,
+     "output": 1630,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00090989
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "offbeat rests",
+       "code": "n(\"0 [~ 2] 4 <5 7> ~ 4 [2 ~] 0\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+       "arrivedMs": 7332.732208999994
+      }
+     ],
+     "label": "offbeat rests",
+     "code": "n(\"0 [~ 2] 4 <5 7> ~ 4 [2 ~] 0\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "dotted long notes",
+       "code": "n(\"0@1.5 2 4@.5 <5 7> 4@.5 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+       "arrivedMs": 7568.5874170000025
+      }
+     ],
+     "label": "dotted long notes",
+     "code": "n(\"0@1.5 2 4@.5 <5 7> 4@.5 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "euclid displaced hits",
+       "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").euclid(5,8).scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+       "arrivedMs": 7852.885041999994
+      }
+     ],
+     "label": "euclid displaced hits",
+     "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").euclid(5,8).scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "melody-drums-halftime",
+   "bufferId": "melody",
+   "buffer": "setcps(0.5)\nstack(\n  n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5),\n  note(\"d2 ~ a1 ~\").s(\"sawtooth\").lpf(500),\n  s(\"bd ~ sd ~, hh*8\")\n)",
+   "selection": {
+    "from": 143,
+    "to": 163,
+    "text": "s(\"bd ~ sd ~, hh*8\")"
+   },
+   "instruction": "half-time feel",
+   "firstArrivalMs": 5474.206666999991,
+   "firstCardMs": 5478.103624999989,
+   "lastSettledMs": 6127.749916999994,
+   "totalMs": 6127.784999999989,
+   "stats": {
+    "calls": 1,
+    "firstMs": 5473.095958999998,
+    "lastMs": 6105.828959000006,
+    "totalMs": 6113.222875000007,
+    "tokens": {
+     "input": 183,
+     "output": 1194,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00069179
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "half-time backbeat",
+       "code": "s(\"bd ~ ~ ~, ~ ~ sd ~, hh*8\")",
+       "arrivedMs": 5474.206666999991
+      }
+     ],
+     "label": "half-time backbeat",
+     "code": "s(\"bd ~ ~ ~, ~ ~ sd ~, hh*8\")",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "sparse quarter hats",
+       "code": "s(\"bd ~ ~ ~, ~ ~ sd ~, hh*4\").gain(\".9 .6\")",
+       "arrivedMs": 5671.408167000001
+      }
+     ],
+     "label": "sparse quarter hats",
+     "code": "s(\"bd ~ ~ ~, ~ ~ sd ~, hh*4\").gain(\".9 .6\")",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "ghost hats half-time",
+       "code": "s(\"bd ~ ~ ~, ~ ~ sd ~, hh*8\").sometimesBy(0.3, x => x.speed(1.5))",
+       "arrivedMs": 5904.076791999993
+      }
+     ],
+     "label": "ghost hats half-time",
+     "code": "s(\"bd ~ ~ ~, ~ ~ sd ~, hh*8\").sometimesBy(0.3, x => x.speed(1.5))",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "808 half-time kit",
+       "code": "s(\"bd ~ ~ ~, ~ ~ sd ~, hh*4\").bank(\"rolandtr808\")",
+       "arrivedMs": 6107.079083999997
+      }
+     ],
+     "label": "808 half-time kit",
+     "code": "s(\"bd ~ ~ ~, ~ ~ sd ~, hh*4\").bank(\"rolandtr808\")",
+     "warnings": [],
+     "retried": false
+    }
+   ]
+  },
+  {
+   "id": "effects-pad",
+   "bufferId": "effects",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*2 ~ bd, ~ cp\").room(0.2),\n  note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0.4),\n  s(\"hh*16\").gain(\".6 .3\").pan(sine.fast(2))\n)",
+   "selection": {
+    "from": 55,
+    "to": 163,
+    "text": "note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0.4)"
+   },
+   "instruction": "",
+   "firstArrivalMs": 4149.695000000007,
+   "firstCardMs": 4163.550541000004,
+   "lastSettledMs": 5286.21987500001,
+   "totalMs": 5325.134124999997,
+   "stats": {
+    "calls": 1,
+    "firstMs": 4148.338625000004,
+    "lastMs": 5273.087458000009,
+    "totalMs": 5323.470333000005,
+    "tokens": {
+     "input": 219,
+     "output": 1010,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00060339
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "offbeat syncopated stabs",
+       "code": "note(\"c3 eb3 g3 bb3\").struct(\"x ~ x x ~ x x ~\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0.4)",
+       "arrivedMs": 4149.695000000007
+      }
+     ],
+     "label": "offbeat syncopated stabs",
+     "code": "note(\"c3 eb3 g3 bb3\").struct(\"x ~ x x ~ x x ~\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0.4)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "wider square timbre",
+       "code": "note(\"c3 eb3 g3 bb3\").s(\"square\").lpf(sine.range(600, 2500).slow(8)).lpq(4).delay(0.4).delaytime(0.375).gain(0.3)",
+       "arrivedMs": 4456.866000000009
+      }
+     ],
+     "label": "wider square timbre",
+     "code": "note(\"c3 eb3 g3 bb3\").s(\"square\").lpf(sine.range(600, 2500).slow(8)).lpq(4).delay(0.4).delaytime(0.375).gain(0.3)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "octave leaps and reversal",
+       "code": "note(\"c3 eb3 g3 bb3\").add(note(\"<0 12 0 -12>\")).s(\"supersaw\").every(4, x => x.rev()).lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0.4)",
+       "arrivedMs": 4864.061833
+      }
+     ],
+     "label": "octave leaps and reversal",
+     "code": "note(\"c3 eb3 g3 bb3\").add(note(\"<0 12 0 -12>\")).s(\"supersaw\").every(4, x => x.rev()).lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0.4)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "chord shift with panning",
+       "code": "note(\"<c3 eb3 g3 bb3> <f2 ab2 c3 eb3>\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).pan(sine.slow(3)).delay(0.4).delaytime(0.375).gain(0.35)",
+       "arrivedMs": 5274.441791000005
+      }
+     ],
+     "label": "chord shift with panning",
+     "code": "note(\"<c3 eb3 g3 bb3> <f2 ab2 c3 eb3>\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).pan(sine.slow(3)).delay(0.4).delaytime(0.375).gain(0.35)",
+     "warnings": [],
+     "retried": false
+    }
+   ]
+  },
+  {
+   "id": "effects-pad-darker",
+   "bufferId": "effects",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*2 ~ bd, ~ cp\").room(0.2),\n  note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0.4),\n  s(\"hh*16\").gain(\".6 .3\").pan(sine.fast(2))\n)",
+   "selection": {
+    "from": 55,
+    "to": 163,
+    "text": "note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0.4)"
+   },
+   "instruction": "darker and wetter",
+   "firstArrivalMs": 3331.0144169999985,
+   "firstCardMs": 3334.5008339999913,
+   "lastSettledMs": 3996.5933749999967,
+   "totalMs": 3996.6198339999974,
+   "stats": {
+    "calls": 1,
+    "firstMs": 3330.026582999999,
+    "lastMs": 3988.5865829999966,
+    "totalMs": 3989.1306249999907,
+    "tokens": {
+     "input": 209,
+     "output": 777,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00048589
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "muffled wet pad",
+       "code": "note(\"c2 eb2 g2 bb2\").s(\"supersaw\").lpf(sine.range(150, 900).slow(8)).delay(0.5).delaytime(0.375).delayfeedback(0.6).room(0.6).gain(0.4)",
+       "arrivedMs": 3331.0144169999985
+      }
+     ],
+     "label": "muffled wet pad",
+     "code": "note(\"c2 eb2 g2 bb2\").s(\"supersaw\").lpf(sine.range(150, 900).slow(8)).delay(0.5).delaytime(0.375).delayfeedback(0.6).room(0.6).gain(0.4)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "dark square swell",
+       "code": "note(\"c3 eb3 g3 bb3\").s(\"square\").lpf(sine.range(250, 1200).slow(8)).lpq(4).delay(0.6).delaytime(0.375).delayfeedback(0.7).room(0.5).gain(0.35)",
+       "arrivedMs": 3597.013249999989
+      }
+     ],
+     "label": "dark square swell",
+     "code": "note(\"c3 eb3 g3 bb3\").s(\"square\").lpf(sine.range(250, 1200).slow(8)).lpq(4).delay(0.6).delaytime(0.375).delayfeedback(0.7).room(0.5).gain(0.35)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "low drone echoes",
+       "code": "note(\"c2 eb2 g2 bb2\").s(\"sawtooth\").lpf(sine.range(200, 1800).slow(8)).delay(0.5).delaytime(0.5).delayfeedback(0.5).room(0.7).gain(0.35)",
+       "arrivedMs": 3989.656541999997
+      }
+     ],
+     "label": "low drone echoes",
+     "code": "note(\"c2 eb2 g2 bb2\").s(\"sawtooth\").lpf(sine.range(200, 1800).slow(8)).delay(0.5).delaytime(0.5).delayfeedback(0.5).room(0.7).gain(0.35)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "effects-hats-busier",
+   "bufferId": "effects",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*2 ~ bd, ~ cp\").room(0.2),\n  note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0.4),\n  s(\"hh*16\").gain(\".6 .3\").pan(sine.fast(2))\n)",
+   "selection": {
+    "from": 167,
+    "to": 209,
+    "text": "s(\"hh*16\").gain(\".6 .3\").pan(sine.fast(2))"
+   },
+   "instruction": "busier",
+   "firstArrivalMs": 4505.179375000007,
+   "firstCardMs": 4509.971167000011,
+   "lastSettledMs": 5054.527750000008,
+   "totalMs": 5069.333167000004,
+   "stats": {
+    "calls": 1,
+    "firstMs": 4504.614708000008,
+    "lastMs": 5044.909207999997,
+    "totalMs": 5068.646999999997,
+    "tokens": {
+     "input": 204,
+     "output": 888,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00054089
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "ghost hats between beats",
+       "code": "s(\"hh*16\").gain(\".6 .3 .45 .2\").pan(sine.fast(2)).sometimesBy(.3, x => x.speed(1.5))",
+       "arrivedMs": 4505.179375000007
+      }
+     ],
+     "label": "ghost hats between beats",
+     "code": "s(\"hh*16\").gain(\".6 .3 .45 .2\").pan(sine.fast(2)).sometimesBy(.3, x => x.speed(1.5))",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "double-time hat roll",
+       "code": "s(\"hh*32\").gain(\".5 .25\").pan(sine.fast(2))",
+       "arrivedMs": 4631.320166999998
+      }
+     ],
+     "label": "double-time hat roll",
+     "code": "s(\"hh*32\").gain(\".5 .25\").pan(sine.fast(2))",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "euclidean open hat layer",
+       "code": "s(\"[hh*16, oh(5,16)]\").gain(\".6 .3\").pan(sine.fast(2))",
+       "arrivedMs": 4827.1466250000085
+      }
+     ],
+     "label": "euclidean open hat layer",
+     "code": "s(\"[hh*16, oh(5,16)]\").gain(\".6 .3\").pan(sine.fast(2))",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "ratcheted hats on alternating",
+       "code": "s(\"hh*8\").ply(\"<1 2 1 3>\").gain(\".6 .3\").pan(sine.fast(2))",
+       "arrivedMs": 5045.641457999998
+      }
+     ],
+     "label": "ratcheted hats on alternating",
+     "code": "s(\"hh*8\").ply(\"<1 2 1 3>\").gain(\".6 .3\").pan(sine.fast(2))",
+     "warnings": [],
+     "retried": false
+    }
+   ]
+  },
+  {
+   "id": "effects-mute-pad",
+   "bufferId": "effects",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*2 ~ bd, ~ cp\").room(0.2),\n  note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0.4),\n  s(\"hh*16\").gain(\".6 .3\").pan(sine.fast(2))\n)",
+   "selection": {
+    "from": 55,
+    "to": 163,
+    "text": "note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0.4)"
+   },
+   "instruction": "mute the pad",
+   "firstArrivalMs": 4005.899875000003,
+   "firstCardMs": 4263.9047500000015,
+   "lastSettledMs": 6361.858584000001,
+   "totalMs": 6361.984417,
+   "stats": {
+    "calls": 1,
+    "firstMs": 4005.3946670000005,
+    "lastMs": 4525.18254200001,
+    "totalMs": 4544.482084000003,
+    "tokens": {
+     "input": 208,
+     "output": 877,
+     "cacheRead": 7649,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00053579
+   },
+   "retries": [
+    {
+     "slot": 1,
+     "reason": "eval",
+     "message": "silence is not a function",
+     "code": "silence()"
+    }
+   ],
+   "drops": [
+    {
+     "slot": 1,
+     "reason": "duplicate",
+     "message": "The option is the same as the earlier option \"gain pinned to zero\".",
+     "code": "note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0)"
+    }
+   ],
+   "slots": [
+    {
+     "status": "dropped",
+     "attempts": [
+      {
+       "label": "silence the pad",
+       "code": "silence()",
+       "arrivedMs": 4005.899875000003,
+       "outcome": "retried: eval"
+      },
+      {
+       "label": "mute pad",
+       "code": "note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0)",
+       "arrivedMs": 6361.509917000003
+      }
+     ],
+     "drop": {
+      "reason": "duplicate",
+      "message": "The option is the same as the earlier option \"gain pinned to zero\"."
+     }
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "gain pinned to zero",
+       "code": "note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0)",
+       "arrivedMs": 4256.793208999996
+      }
+     ],
+     "label": "gain pinned to zero",
+     "code": "note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "pad drops out on",
+       "code": "note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(\"<0 0 0 0.4>\")",
+       "arrivedMs": 4525.668583999999
+      }
+     ],
+     "label": "pad drops out on",
+     "code": "note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(\"<0 0 0 0.4>\")",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  }
+ ]
+}

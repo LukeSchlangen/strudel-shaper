@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { CATEGORIES, buildReference, parseDocs } from '../scripts/build-reference';
+import { CATEGORIES, VALUES, buildReference, parseDocs } from '../scripts/build-reference';
 import { Sandbox } from '../src/sandbox';
 import { COMMON_DRUMS, summariseSounds } from '../src/soundSummary';
 import { soundKey } from '../src/sandbox';
@@ -20,6 +20,15 @@ describe('build-reference', () => {
     const { missing } = buildReference();
     expect(missing).toEqual([]);
     for (const [, names] of CATEGORIES) for (const n of names) expect(live.has(n), n).toBe(true);
+  });
+
+  it('writes signals and silence as values, never calls', () => {
+    const { text } = buildReference();
+    const listed = new Set(CATEGORIES.flatMap(([, names]) => names));
+    for (const v of [...VALUES].filter((v) => listed.has(v))) {
+      expect(text, v).toMatch(new RegExp(`^- ${v}[: ]`, 'm'));
+      expect(text, v).not.toMatch(new RegExp(`\\b${v}\\(\\)(?!\`)`));
+    }
   });
 
   it('stays within the prompt budget', () => {

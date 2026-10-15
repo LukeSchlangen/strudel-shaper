@@ -1,0 +1,276 @@
+{
+ "label": "coldschema-nowarm-1",
+ "createdAt": "2026-10-15T18:11:10.148Z",
+ "config": {
+  "provider": "claude",
+  "model": "claude-haiku-5-5",
+  "effort": "low",
+  "thinking": "off",
+  "warmup": false,
+  "only": [
+   "drums-kick",
+   "bass-darker",
+   "melody-empty"
+  ],
+  "label": "coldschema-nowarm-1",
+  "schemaKey": "opts_cold_1_1792087862"
+ },
+ "soundsTokens": 1053,
+ "referenceTokens": 2414,
+ "results": [
+  {
+   "id": "drums-kick",
+   "bufferId": "drums",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*4\"),\n  s(\"~ sd ~ sd\").bank(\"tr909\"),\n  s(\"hh*8\").gain(0.5),\n  s(\"~ ~ ~ oh\").gain(0.4)\n)",
+   "selection": {
+    "from": 21,
+    "to": 30,
+    "text": "s(\"bd*4\")"
+   },
+   "instruction": "",
+   "firstArrivalMs": 1745.14425,
+   "firstCardMs": 1756.707416,
+   "lastSettledMs": 2361.1441250000003,
+   "totalMs": 2388.6334580000002,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1741.213459,
+    "lastMs": 2347.925625,
+    "totalMs": 2382.357542,
+    "tokens": {
+     "input": 163,
+     "output": 229,
+     "cacheRead": 0,
+     "cacheWrite": 7670
+    },
+    "costUsd": 0.00108955
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "euclidean kick pattern",
+       "code": "s(\"bd(3,8)\").bank(\"tr909\")",
+       "arrivedMs": 1745.14425
+      }
+     ],
+     "label": "euclidean kick pattern",
+     "code": "s(\"bd(3,8)\").bank(\"tr909\")",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "half time kick",
+       "code": "s(\"bd ~ ~ bd ~ ~ bd ~\").bank(\"tr909\")",
+       "arrivedMs": 1911.4215000000002
+      }
+     ],
+     "label": "half time kick",
+     "code": "s(\"bd ~ ~ bd ~ ~ bd ~\").bank(\"tr909\")",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "kick with ghost hits",
+       "code": "s(\"bd*2 [~ bd]*2\").gain(\"1 .6\").bank(\"tr909\")",
+       "arrivedMs": 2167.030416
+      }
+     ],
+     "label": "kick with ghost hits",
+     "code": "s(\"bd*2 [~ bd]*2\").gain(\"1 .6\").bank(\"tr909\")",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "kick fill on last",
+       "code": "s(\"bd*4\").lastOf(4, x => x.fast(2)).bank(\"tr909\")",
+       "arrivedMs": 2350.756416
+      }
+     ],
+     "label": "kick fill on last",
+     "code": "s(\"bd*4\").lastOf(4, x => x.fast(2)).bank(\"tr909\")",
+     "warnings": [],
+     "retried": false
+    }
+   ]
+  },
+  {
+   "id": "bass-darker",
+   "bufferId": "bass",
+   "buffer": "setcps(0.55)\nstack(\n  s(\"bd*4, ~ cp\"),\n  note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0),\n  s(\"hh*8\").gain(0.4)\n)",
+   "selection": {
+    "from": 41,
+    "to": 119,
+    "text": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0)"
+   },
+   "instruction": "darker",
+   "firstArrivalMs": 2138.9470409999994,
+   "firstCardMs": 2147.065541,
+   "lastSettledMs": 2688.1946659999994,
+   "totalMs": 2712.1636659999995,
+   "stats": {
+    "calls": 1,
+    "firstMs": 2137.267583,
+    "lastMs": 2681.266375,
+    "totalMs": 2710.1054999999997,
+    "tokens": {
+     "input": 167,
+     "output": 254,
+     "cacheRead": 7670,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00022040000000000002
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "darker low filter",
+       "code": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(320).lpq(10).decay(0.2).sustain(0)",
+       "arrivedMs": 2138.9470409999994
+      }
+     ],
+     "label": "darker low filter",
+     "code": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(320).lpq(10).decay(0.2).sustain(0)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "sub octave drop",
+       "code": "note(\"<c1 c1 ab0 bb0>*4\").s(\"sine\").lpf(260).lpq(4).decay(0.25).sustain(0)",
+       "arrivedMs": 2400.533458
+      }
+     ],
+     "label": "sub octave drop",
+     "code": "note(\"<c1 c1 ab0 bb0>*4\").s(\"sine\").lpf(260).lpq(4).decay(0.25).sustain(0)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "detuned minor growl",
+       "code": "note(\"<c2 c2 ab1 bb1>*4\").s(\"square\").lpf(sine.range(180, 500).slow(4)).lpq(12).decay(0.18).sustain(0)",
+       "arrivedMs": 2682.8611249999994
+      }
+     ],
+     "label": "detuned minor growl",
+     "code": "note(\"<c2 c2 ab1 bb1>*4\").s(\"square\").lpf(sine.range(180, 500).slow(4)).lpq(12).decay(0.18).sustain(0)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "melody-empty",
+   "bufferId": "melody",
+   "buffer": "setcps(0.5)\nstack(\n  n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5),\n  note(\"d2 ~ a1 ~\").s(\"sawtooth\").lpf(500),\n  s(\"bd ~ sd ~, hh*8\")\n)",
+   "selection": {
+    "from": 21,
+    "to": 95,
+    "text": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)"
+   },
+   "instruction": "",
+   "firstArrivalMs": 1504.711875,
+   "firstCardMs": 1513.5004580000004,
+   "lastSettledMs": 2489.996583,
+   "totalMs": 2514.1330829999997,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1503.694708,
+    "lastMs": 2481.014,
+    "totalMs": 2513.069875,
+    "tokens": {
+     "input": 195,
+     "output": 380,
+     "cacheRead": 7670,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00028619999999999996
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "syncopated dorian riff",
+       "code": "n(\"0 [2 ~] 4 <5 7> ~ 4 2 [0 ~]\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+       "arrivedMs": 1504.711875
+      }
+     ],
+     "label": "syncopated dorian riff",
+     "code": "n(\"0 [2 ~] 4 <5 7> ~ 4 2 [0 ~]\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "octave jump lead",
+       "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").add(n(\"<0 0 0 12>\")).s(\"square\").lpf(1800).gain(0.5)",
+       "arrivedMs": 1847.985208
+      }
+     ],
+     "label": "octave jump lead",
+     "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").add(n(\"<0 0 0 12>\")).s(\"square\").lpf(1800).gain(0.5)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "filter swept arp",
+       "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"sawtooth\").lpf(sine.range(600, 2400).slow(4)).gain(0.45)",
+       "arrivedMs": 2200.8424999999997
+      }
+     ],
+     "label": "filter swept arp",
+     "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"sawtooth\").lpf(sine.range(600, 2400).slow(4)).gain(0.45)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "euclid call and response",
+       "code": "n(\"0 2 4 <5 7>\").euclid(5, 8).scale(\"D:dorian\").s(\"triangle\").lpf(1800).gain(0.5).jux(rev)",
+       "arrivedMs": 2481.665041
+      }
+     ],
+     "label": "euclid call and response",
+     "code": "n(\"0 2 4 <5 7>\").euclid(5, 8).scale(\"D:dorian\").s(\"triangle\").lpf(1800).gain(0.5).jux(rev)",
+     "warnings": [],
+     "retried": false
+    }
+   ]
+  }
+ ]
+}
