@@ -98,9 +98,12 @@ export class MockProvider implements Provider {
     const requestSeed = this.seed + this.requestCount++;
     const rand = prng(requestSeed);
     const text = req.selection.text;
+    // Append before any trailing whitespace or separator: `a,` + `.fast(2)` must become `a.fast(2),`.
+    const tail = /[\s,;]*$/.exec(text)!;
+    const append = (suffix: string) => text.slice(0, tail.index) + suffix + tail[0];
     const options: Option[] =
       req.mode === 'shape'
-        ? pickTransforms(req.instruction, rand).map((t) => ({ id: '', label: t.label, code: text + t.suffix }))
+        ? pickTransforms(req.instruction, rand).map((t) => ({ id: '', label: t.label, code: append(t.suffix) }))
         : [{ id: '', label: 'mock fix', code: text }];
 
     for (const [i, option] of options.entries()) {

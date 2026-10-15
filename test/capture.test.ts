@@ -24,6 +24,14 @@ describe('captureRange', () => {
     expect(text(stateAt(at('"bd*4"'), at('"bd*4"', 6)))).toBe('"bd*4"');
   });
 
+  it('trims whitespace and a trailing comma from a whole-line selection', () => {
+    const line = '  s("hh*8").gain(0.6),';
+    const from = at(line);
+    expect(text(stateAt(from, from + line.length))).toBe('s("hh*8").gain(0.6)');
+    expect(text(stateAt(from, from + line.length + 1))).toBe('s("hh*8").gain(0.6)'); // with the newline
+    expect(text(stateAt(from + line.length + 1, from))).toBe('s("hh*8").gain(0.6)'); // selected backwards
+  });
+
   it('picks the expression on the cursor line, without indent or trailing comma', () => {
     expect(text(stateAt(at('bd*4')))).toBe('s("bd*4")');
     expect(text(stateAt(at('gain')))).toBe('s("hh*8").gain(0.6)');

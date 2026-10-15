@@ -8,7 +8,15 @@ import type { Range } from './splice';
  */
 export function captureRange(state: EditorState): Range {
   const sel = state.selection.main;
-  if (!sel.empty) return { from: sel.from, to: sel.to };
+  if (!sel.empty) {
+    // Drop surrounding whitespace and a trailing separator (a whole-line or triple-click selection
+    // picks up `,` and the newline), so they stay in the buffer and options replace just the expression.
+    const text = state.doc.sliceString(sel.from, sel.to);
+    const lead = text.length - text.trimStart().length;
+    const core = text.slice(lead).replace(/[\s,;]+$/, '');
+    if (core) return { from: sel.from + lead, to: sel.from + lead + core.length };
+    return { from: sel.from, to: sel.to };
+  }
 
   const line = state.doc.lineAt(sel.head);
   const lead = line.text.length - line.text.trimStart().length;

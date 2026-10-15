@@ -61,6 +61,31 @@ describe('MockProvider', () => {
     }
   });
 
+  it('appends before a trailing comma or newline in the selection', async () => {
+    for (const tail of [',', ',\n', '  ', ';']) {
+      const req = request();
+      req.selection = { ...req.selection, text: HH + tail };
+      const opts = await collect(noDelay().generateOptions(req, new AbortController().signal));
+      for (const o of opts) {
+        expect(o.code.endsWith(tail)).toBe(true);
+        expect(TRANSFORMS.some((t) => o.code === HH + t.suffix + tail)).toBe(true);
+      }
+    }
+  });
+
+  it('a whole-line selection with its comma still evaluates in the starter buffer', async () => {
+    await core.evalScope(core, mini, { setcps: () => core.silence });
+    const line = HH + ',';
+    const from = STARTER_CODE.indexOf(line);
+    const req = request();
+    req.selection = { from, to: from + line.length, text: line };
+    for (const o of await collect(noDelay().generateOptions(req, new AbortController().signal))) {
+      const code = splice(STARTER_CODE, { from, to: from + line.length }, o.code);
+      const { pattern } = await core.evaluate(code, transpiler, {});
+      expect(core.isPattern(pattern)).toBe(true);
+    }
+  });
+
   it('fix modes return one unchanged option', async () => {
     for (const mode of ['fix-minimal', 'fix-rewrite'] as Mode[]) {
       const opts = await collect(noDelay().generateOptions(request('', mode), new AbortController().signal));
