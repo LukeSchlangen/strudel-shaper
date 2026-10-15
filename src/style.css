@@ -13,7 +13,7 @@ header button { background: #2a2a2a; color: #ddd; border: 1px solid #444; paddin
 #tray .stale { color: #f7768e; }
 #tray .cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
 #tray .card { border: 1px solid #444; padding: 6px 8px; font-size: 12px; cursor: pointer; }
-#tray .card code { display: block; margin-top: 4px; white-space: pre-wrap; word-break: break-all; color: #aaa; }
+#tray .card code { display: block; margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; color: #aaa; }
 #tray .card.heard { border-color: #9ece6a; background: #1f2a1a; }
 #tray .card.failed { border-color: #f7768e; }
 #tray.is-stale .card:not(:first-child) { opacity: 0.4; }

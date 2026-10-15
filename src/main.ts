@@ -174,7 +174,12 @@ let state: TrayState = initialState;
 let liveRange: Range | null = null; // the captured range, carried through edits made outside it
 let requestSeq = 0;
 let controller: AbortController | null = null;
-let timing: { startedAt: number; firstMs?: number; lastMs?: number } | null = null;
+interface Timing {
+  requestId: number;
+  firstMs?: number;
+  lastMs?: number;
+}
+let timing: Timing | null = null;
 
 async function send(event: TrayEvent) {
   const t = transition(state, event);
@@ -235,13 +240,14 @@ async function streamOptions(effect: Extract<Effect, { type: 'startRequest' }>, 
     cps: scheduler.cps,
   };
   const startedAt = performance.now();
-  timing = { startedAt };
+  const times: Timing = (timing = { requestId });
+  render();
   try {
     for await (const option of provider.generateOptions(req, signal)) {
       if (signal.aborted) return;
       const ms = performance.now() - startedAt;
-      timing.firstMs ??= ms;
-      timing.lastMs = ms;
+      times.firstMs ??= ms;
+      times.lastMs = ms;
       send({ type: 'optionArrived', requestId, option });
     }
     if (!signal.aborted) send({ type: 'requestDone', requestId });
@@ -389,7 +395,7 @@ function render() {
   trayEl.hidden = false;
   trayEl.classList.toggle('is-stale', tray.stale);
 
-  const original = card(0, ['original', tray.heard === 0 ? 'heard' : ''], 'original', escapeHtml(tray.capture.text));
+  const original = card(0, ['original', tray.heard === 0 ? 'heard' : ''], 'original', codeHtml(tray.capture.text));
   const options = tray.slots.map((s, i) => {
     const slot = i + 1;
     const classes = [s.status, slot === tray.heard ? 'heard' : ''];
@@ -399,11 +405,12 @@ function render() {
     return card(slot, classes, label, diffHtml(tray.capture.text, s.option!.code));
   });
 
+  const times = timing?.requestId === tray.requestId ? timing : null; // never show the previous request's times
   const ms = (v?: number) => (v === undefined ? '…' : v < 1000 ? `${Math.round(v)} ms` : `${(v / 1000).toFixed(1)} s`);
   const status = [
     `provider: ${provider.name}`,
-    `first ${ms(timing?.firstMs)}`,
-    `last ${tray.done ? ms(timing?.lastMs) : '…'}`,
+    `first ${ms(times?.firstMs)}`,
+    `last ${tray.done ? ms(times?.lastMs) : '…'}`,
     tray.heard === 0 ? 'audition: off (original)' : `audition: on (option ${tray.heard})`,
     swap,
   ].join(' · ');
@@ -421,8 +428,13 @@ function card(slot: number, classes: string[], label: string, body: string) {
 
 function diffHtml(before: string, after: string) {
   return diffSegments(before, after)
-    .map(({ kind, text }) => (kind === 'same' ? escapeHtml(text) : `<${kind}>${escapeHtml(text)}</${kind}>`))
+    .map(({ kind, text }) => (kind === 'same' ? codeHtml(text) : `<${kind}>${codeHtml(text)}</${kind}>`))
     .join('');
+}
+
+/** Escaped code with line-break opportunities before each `.method`, so narrow cards wrap at calls, not mid-token. */
+function codeHtml(code: string) {
+  return escapeHtml(code).replace(/\.(?=[A-Za-z_$])/g, '<wbr>.');
 }
 
 function escapeHtml(s: string) {
@@ -543,6 +555,7 @@ Object.assign(window, {
     send,
     measure,
     getState: () => state,
+    audioContext: () => getAudioContext(),
     get provider() {
       return provider;
     },

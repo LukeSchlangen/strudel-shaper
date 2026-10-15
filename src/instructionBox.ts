@@ -20,7 +20,7 @@ export class InstructionBox {
     const dom = document.createElement('div');
     dom.className = 'shaper-instruction';
     this.input.type = 'text';
-    this.input.placeholder = 'instruction (Enter to send, empty is fine · Esc cancels)';
+    this.input.placeholder = 'instruction · Enter sends (empty ok) · Esc cancels';
     this.input.spellcheck = false;
     dom.append(this.input);
     const tooltip = (pos: number): Tooltip => ({
