@@ -16,6 +16,8 @@ export default defineConfig({
   },
   // The validation worker (src/validator.worker.ts) imports Strudel, which code-splits.
   worker: { format: 'es' },
+  // The model proxy (server/, started by `npm run dev`) holds the API key; the browser only sees /api.
+  server: { proxy: { '/api': `http://127.0.0.1:${process.env.PORT ?? 8787}` } },
   test: {
     environment: 'node',
     // Under Node, @kabelsalat/web resolves to its CJS "main", which lacks SalatRepl (needed by core's
