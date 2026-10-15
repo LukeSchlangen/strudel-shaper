@@ -115,8 +115,11 @@ export class MockProvider implements Provider {
   private readonly minDelayMs: number;
   private readonly maxDelayMs: number;
   private readonly sleep: Sleep;
-  /** Codes issued since the last full request, so replacements don't repeat them. */
-  private issued = new Set<string>();
+  /**
+   * Codes planned or issued since the last full request, so replacements don't repeat them. Planned
+   * counts too: a replacement can be asked for before the rest of the stream has been yielded.
+   */
+  private taken = new Set<string>();
 
   constructor({
     seed,
@@ -193,14 +196,15 @@ export class MockProvider implements Provider {
     if (req.feedback) {
       // A replacement for one failed option: one option, valid unless retryFails.
       const candidates = req.mode === 'shape' ? shuffle(TRANSFORMS, rand) : FIX_CANDIDATES;
-      const fresh = candidates.find((t) => !this.issued.has(append(t.suffix))) ?? candidates[0];
+      const fresh = candidates.find((t) => !this.taken.has(append(t.suffix))) ?? candidates[0];
       planned = [{ label: fresh.label, code: append(fresh.suffix) }];
+      this.taken.add(planned[0].code); // now, since several replacements can be pending at once
     } else {
-      this.issued = new Set();
       planned =
         req.mode === 'shape'
           ? pickTransforms(req.instruction, rand).map((t) => ({ label: t.label, code: append(t.suffix) }))
           : [{ label: FIX_CANDIDATES[0].label, code: append(FIX_CANDIDATES[0].suffix) }];
+      this.taken = new Set(planned.map((p) => p.code));
     }
 
     for (const [i, plan] of planned.entries()) {
@@ -211,7 +215,7 @@ export class MockProvider implements Provider {
       if (signal.aborted) return;
       const option = { ...chosen, id: `mock-${requestSeed}-${i}` };
       if (kind) this.faultLog.push({ optionId: option.id, kind, code: option.code });
-      this.issued.add(option.code);
+      this.taken.add(option.code);
       if (!kind) clean.push(option);
       yield option;
     }

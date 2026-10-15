@@ -1,6 +1,6 @@
 import '@strudel/repl/repl-component.mjs';
-import { getAudioContext } from '@strudel/webaudio';
-import { Pattern } from '@strudel/core';
+import { getAudioContext, soundMap } from '@strudel/webaudio';
+import { Pattern, strudelScope } from '@strudel/core';
 import { EditorView } from '@codemirror/view';
 import { StateEffect } from '@codemirror/state';
 import { captureRange } from './capture';
@@ -10,10 +10,12 @@ import { InstructionBox } from './instructionBox';
 import { InstructionHistory } from './instructionHistory';
 import { MockProvider } from './mockProvider';
 import { STARTER_CODE } from './options';
+import { runRequest } from './pipeline';
 import type { Mode, OptionRequest, Provider } from './provider';
 import { Quantizer } from './quantize';
 import { isRangeIntact, mapRange, splice, type Capture, type Edit, type Range } from './splice';
-import { initialState, transition, type Effect, type Slot, type TrayEvent, type TrayState } from './trayMachine';
+import { initialState, slotCount, transition, type Effect, type Slot, type TrayEvent, type TrayState } from './trayMachine';
+import { Validator, WorkerBackend, type WorkerLike } from './validator';
 
 // --- Strudel wiring -------------------------------------------------------------------------
 
@@ -34,6 +36,28 @@ document.getElementById('play')!.addEventListener('click', () => mirror.evaluate
 document.getElementById('stop')!.addEventListener('click', () => mirror.stop());
 
 let provider: Provider = new MockProvider({ seed: Date.now() >>> 0 });
+
+// --- Validation -------------------------------------------------------------------------------
+
+// Options are checked in a worker (its own realm: see src/sandbox.ts) before they reach a card.
+const backend = new WorkerBackend(
+  () => new Worker(new URL('./validator.worker.ts', import.meta.url), { type: 'module' }) as unknown as WorkerLike,
+);
+const validator = new Validator({
+  backend,
+  hasSound: (key) => key in soundMap.get(), // read only
+  cps: () => scheduler.cps,
+});
+// The live scope is complete (and soundMap filled) once prebake has run. Names the worker can't load
+// (webaudio, draw, codemirror, hydra, soundfonts, midi) become stubs there. Checks wait for this.
+Promise.resolve(mirror.prebaked)
+  .catch((err: unknown) => console.error('[shaper] prebake failed', err))
+  .then(() => {
+    const methods = Object.getOwnPropertyNames(Pattern.prototype).filter(
+      (name) => typeof Object.getOwnPropertyDescriptor(Pattern.prototype, name)?.value === 'function',
+    );
+    backend.init({ globals: Object.keys(strudelScope), methods });
+  });
 
 // --- Audio on the first keypress ---------------------------------------------------------------
 
@@ -176,8 +200,10 @@ let requestSeq = 0;
 let controller: AbortController | null = null;
 interface Timing {
   requestId: number;
-  firstMs?: number;
-  lastMs?: number;
+  firstMs?: number; // first card shown (validated)
+  lastMs?: number; // last slot settled
+  rawFirstMs?: number; // first option from the provider
+  rawLastMs?: number;
 }
 let timing: Timing | null = null;
 
@@ -242,19 +268,31 @@ async function streamOptions(effect: Extract<Effect, { type: 'startRequest' }>, 
   const startedAt = performance.now();
   const times: Timing = (timing = { requestId });
   render();
-  try {
-    for await (const option of provider.generateOptions(req, signal)) {
-      if (signal.aborted) return;
-      const ms = performance.now() - startedAt;
-      times.firstMs ??= ms;
-      times.lastMs = ms;
-      send({ type: 'optionArrived', requestId, option });
-    }
-    if (!signal.aborted) send({ type: 'requestDone', requestId });
-  } catch (err) {
-    console.error('[shaper] provider failed', err);
-    if (!signal.aborted) send({ type: 'requestDone', requestId, error: String((err as Error)?.message ?? err) });
-  }
+  await runRequest(
+    {
+      provider,
+      validator,
+      getBuffer: () => view.state.doc.toString(),
+      getRange: () => liveRange ?? capture.range,
+      emit: (event) => {
+        const ms = performance.now() - startedAt;
+        if (event.type === 'optionArrived') {
+          times.rawFirstMs ??= ms;
+          times.rawLastMs = ms;
+        }
+        if (event.type === 'optionValidated') times.firstMs ??= ms;
+        if (event.type === 'optionValidated' || event.type === 'optionDropped') times.lastMs = ms;
+        if (event.type === 'requestDone') {
+          console.log('[shaper] request timing', { ...times, provider: provider.name });
+        }
+        send(event);
+      },
+    },
+    requestId,
+    req,
+    slotCount(mode),
+    signal,
+  );
 }
 
 // --- Capture ----------------------------------------------------------------------------------

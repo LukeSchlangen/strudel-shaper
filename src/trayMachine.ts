@@ -1,14 +1,29 @@
 import type { Mode, Option } from './provider';
 import type { Capture } from './splice';
+import type { DropReason, Warning } from './validator';
 
 /** 0 is the original (the editor's real text); 1–4 are the option cards. */
 export type Slot = 0 | 1 | 2 | 3 | 4;
 
-export type SlotStatus = 'pending' | 'ready' | 'failed' | 'empty';
+/** 1–4: the option cards. */
+export type OptionSlot = Exclude<Slot, 0>;
+
+/**
+ * pending: nothing yet · validating: raw option arrived, being checked · retrying: dropped once,
+ * waiting for the replacement · ready: passed, can be auditioned · dropped: failed for good ·
+ * failed: passed validation but the live evaluation failed (backstop) · empty: the provider sent nothing.
+ */
+export type SlotStatus = 'pending' | 'validating' | 'retrying' | 'ready' | 'dropped' | 'failed' | 'empty';
 
 export interface SlotCard {
   status: SlotStatus;
   option?: Option;
+  warnings?: Warning[];
+  unknownSounds?: string[];
+  /** A replacement was asked for. */
+  retried?: boolean;
+  /** Why the slot was (last) dropped. */
+  drop?: { reason: DropReason; message: string };
 }
 
 export interface TrayRequest {
@@ -25,6 +40,8 @@ export interface Tray extends TrayRequest {
   error?: string;
   heard: Slot;
   stale: boolean;
+  /** Time each validation took, for the status line. */
+  validationMs: number[];
 }
 
 export type TrayState =
@@ -36,7 +53,10 @@ export type TrayEvent =
   // requestId comes from the caller so ids stay unique across trays.
   | ({ type: 'request'; requestId: number } & TrayRequest)
   | { type: 'regenerate'; requestId: number }
-  | { type: 'optionArrived'; requestId: number; option: Option }
+  | { type: 'optionArrived'; requestId: number; slot: OptionSlot; option: Option }
+  | { type: 'optionValidated'; requestId: number; slot: OptionSlot; option: Option; warnings: Warning[]; unknownSounds?: string[]; ms: number }
+  | { type: 'optionRetrying'; requestId: number; slot: OptionSlot; reason: DropReason; message: string; ms: number }
+  | { type: 'optionDropped'; requestId: number; slot: OptionSlot; reason: DropReason; message: string; ms: number }
   | { type: 'requestDone'; requestId: number; error?: string }
   | { type: 'audition'; slot: Slot }
   | { type: 'escape' }
@@ -70,7 +90,7 @@ function openTray(req: TrayRequest, requestId: number): Transition {
   const { capture, mode, instruction } = req;
   const slots = Array.from({ length: slotCount(mode) }, (): SlotCard => ({ status: 'pending' }));
   return {
-    state: { kind: 'tray', capture, mode, instruction, requestId, slots, done: false, heard: 0, stale: false },
+    state: { kind: 'tray', capture, mode, instruction, requestId, slots, done: false, heard: 0, stale: false, validationMs: [] },
     effects: [{ type: 'startRequest', requestId, capture, mode, instruction }],
   };
 }
@@ -110,11 +130,37 @@ function trayTransition(state: Tray, event: TrayEvent): Transition {
       return { state: next.state, effects: [...abort, ...restoreOriginal, ...next.effects] };
     }
 
-    case 'optionArrived': {
-      if (event.requestId !== state.requestId) return stay(state);
-      const i = state.slots.findIndex((s) => s.status === 'pending');
-      if (i === -1) return stay(state);
-      return withSlots(state.slots.map((s, j) => (j === i ? { status: 'ready', option: event.option } : s)));
+    case 'optionArrived':
+    case 'optionValidated':
+    case 'optionRetrying':
+    case 'optionDropped': {
+      if (event.requestId !== state.requestId || state.stale) return stay(state);
+      const i = event.slot - 1;
+      const card = state.slots[i];
+      if (!card) return stay(state);
+      const timed = 'ms' in event ? { validationMs: [...state.validationMs, event.ms] } : {};
+      const slots = [...state.slots];
+      switch (event.type) {
+        case 'optionArrived':
+          slots[i] = { ...card, status: 'validating', option: event.option };
+          break;
+        case 'optionValidated':
+          slots[i] = {
+            status: 'ready',
+            option: event.option,
+            warnings: event.warnings,
+            unknownSounds: event.unknownSounds,
+            retried: card.retried,
+          };
+          break;
+        case 'optionRetrying':
+          slots[i] = { ...card, status: 'retrying', retried: true, drop: { reason: event.reason, message: event.message } };
+          break;
+        case 'optionDropped':
+          slots[i] = { ...card, status: 'dropped', drop: { reason: event.reason, message: event.message } };
+          break;
+      }
+      return withSlots(slots, timed);
     }
 
     case 'requestDone': {
@@ -158,7 +204,8 @@ function trayTransition(state: Tray, event: TrayEvent): Transition {
 
     case 'stale': {
       // The options no longer fit the text, so there's no point waiting for more.
-      const slots = state.slots.map((s): SlotCard => (s.status === 'pending' ? { status: 'empty' } : s));
+      const unsettled = ['pending', 'validating', 'retrying'];
+      const slots = state.slots.map((s): SlotCard => (unsettled.includes(s.status) ? { status: 'empty' } : s));
       return backToOriginal({ stale: true, slots, done: true }, abort);
     }
 

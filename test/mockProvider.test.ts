@@ -199,6 +199,19 @@ describe('faulty mode', () => {
     expect(p.faultLog).toHaveLength(4); // only the first request's options
   });
 
+  it('replacements asked for at the same time differ from each other and from planned options', async () => {
+    const p = new MockProvider({ seed: 5, minDelayMs: 10, maxDelayMs: 10 });
+    const stream = p.generateOptions(request(), new AbortController().signal)[Symbol.asyncIterator]();
+    const first = (await stream.next()).value as Option;
+    // Two retries in flight while three planned options are still to come.
+    const req = { ...request(), feedback: { previousCode: first.code, error: 'syntax: x' } };
+    const [a, b] = await Promise.all([1, 2].map(async () => (await collect(p.generateOptions(req, new AbortController().signal)))[0]));
+    const rest = [];
+    for (let r = await stream.next(); !r.done; r = await stream.next()) rest.push(r.value.code);
+    const all = [first.code, ...rest, a.code, b.code];
+    expect(new Set(all).size).toBe(6);
+  });
+
   it('with feedback and retryFails: broken again', async () => {
     const p = faulty({ retryFails: true });
     const req = { ...request(), feedback: { previousCode: 'x', error: 'eval: nope' } };

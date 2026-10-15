@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { initialState, transition, type Effect, type TrayEvent, type TrayState } from '../src/trayMachine';
+import { initialState, transition, type Effect, type OptionSlot, type TrayEvent, type TrayState } from '../src/trayMachine';
 import type { Option } from '../src/provider';
 import type { Capture } from '../src/splice';
 
@@ -7,7 +7,15 @@ const capture: Capture = { range: { from: 2, to: 5 }, text: 'abc', buffer: 'xxab
 const opt = (n: number, requestId = 1): Option => ({ id: `r${requestId}-${n}`, label: `opt ${n}`, code: `abc.o${n}()` });
 
 const request: TrayEvent = { type: 'request', requestId: 1, capture, mode: 'shape', instruction: 'busier' };
-const arrive = (n: number, requestId = 1): TrayEvent => ({ type: 'optionArrived', requestId, option: opt(n, requestId) });
+/** Option n has arrived and passed validation, in slot n. */
+const arrive = (n: number, requestId = 1): TrayEvent => ({
+  type: 'optionValidated',
+  requestId,
+  slot: n as OptionSlot,
+  option: opt(n, requestId),
+  warnings: [],
+  ms: 1,
+});
 /** Open the tray and let all four options arrive. */
 const ready: TrayEvent[] = [request, arrive(1), arrive(2), arrive(3), arrive(4), { type: 'requestDone', requestId: 1 }];
 
@@ -240,5 +248,79 @@ describe('tray state machine: regenerate, new requests and outside evaluation', 
     expect(heard.effects).toEqual([{ type: 'abortRequest' }, { type: 'resumeHighlight' }]);
     const original = after(ready, [{ type: 'externalEval' }]);
     expect(original).toEqual({ state: { kind: 'playing' }, effects: [] });
+  });
+});
+
+describe('tray state machine: validation', () => {
+  const slotsOf = (state: TrayState) => (state.kind === 'tray' ? state.slots : []);
+  const raw = (n: number): TrayEvent => ({ type: 'optionArrived', requestId: 1, slot: n as OptionSlot, option: opt(n) });
+
+  it('a raw option shows as validating and cannot be auditioned', () => {
+    const { state, effects } = after([request, raw(2)], [{ type: 'audition', slot: 2 }]);
+    expect(slotsOf(state).map((s) => s.status)).toEqual(['pending', 'validating', 'pending', 'pending']);
+    expect(slotsOf(state)[1].option).toEqual(opt(2));
+    expect(effects).toEqual([]);
+  });
+
+  it('validated with warnings: ready, badges kept, auditionable', () => {
+    const { state, effects } = run([
+      request,
+      raw(1),
+      { type: 'optionValidated', requestId: 1, slot: 1, option: opt(1), warnings: ['unknown-sample'], unknownSounds: ['zzzz'], ms: 4 },
+      { type: 'audition', slot: 1 },
+    ]);
+    expect(slotsOf(state)[0]).toEqual({ status: 'ready', option: opt(1), warnings: ['unknown-sample'], unknownSounds: ['zzzz'], retried: undefined });
+    expect(effects.map((e) => e.type)).toEqual(['startRequest', 'pauseHighlight', 'auditionOption']);
+    expect(state).toMatchObject({ validationMs: [4] });
+  });
+
+  it('retrying, then the replacement passes: ready and marked retried', () => {
+    const replacement = { ...opt(9), code: 'abc.fast(2)' };
+    const { state } = run([
+      request,
+      raw(1),
+      { type: 'optionRetrying', requestId: 1, slot: 1, reason: 'syntax', message: 'Unexpected token', ms: 1 },
+    ]);
+    expect(slotsOf(state)[0]).toMatchObject({ status: 'retrying', retried: true, drop: { reason: 'syntax' } });
+    const done = run(
+      [
+        { type: 'optionArrived', requestId: 1, slot: 1, option: replacement },
+        { type: 'optionValidated', requestId: 1, slot: 1, option: replacement, warnings: [], ms: 2 },
+      ],
+      state,
+    ).state;
+    expect(slotsOf(done)[0]).toMatchObject({ status: 'ready', option: replacement, retried: true });
+    expect(done).toMatchObject({ validationMs: [1, 2] });
+  });
+
+  it('dropped for good keeps the reason and message', () => {
+    const { state } = run([
+      request,
+      raw(1),
+      { type: 'optionRetrying', requestId: 1, slot: 1, reason: 'eval', message: 'x.wobble is not a function', ms: 1 },
+      { type: 'optionDropped', requestId: 1, slot: 1, reason: 'query', message: 'boom', ms: 1 },
+      { type: 'audition', slot: 1 },
+    ]);
+    expect(slotsOf(state)[0]).toMatchObject({ status: 'dropped', retried: true, drop: { reason: 'query', message: 'boom' } });
+    expect(state).toMatchObject({ heard: 0 });
+  });
+
+  it('ignores validation events from an old request or for a slot that does not exist', () => {
+    const { state } = run([
+      request,
+      { type: 'optionDropped', requestId: 0, slot: 1, reason: 'syntax', message: '', ms: 1 },
+      { type: 'optionArrived', requestId: 1, slot: 4, option: opt(4) },
+    ]);
+    expect(slotsOf(state).map((s) => s.status)).toEqual(['pending', 'pending', 'pending', 'validating']);
+    const fix = run([{ ...request, mode: 'fix-minimal', instruction: '' } as TrayEvent, raw(2)]).state;
+    expect(slotsOf(fix).map((s) => s.status)).toEqual(['pending']);
+  });
+
+  it('stale clears slots still validating or retrying', () => {
+    const { state } = after(
+      [request, arrive(1), raw(2), { type: 'optionRetrying', requestId: 1, slot: 3, reason: 'syntax', message: '', ms: 1 }],
+      [{ type: 'stale' }],
+    );
+    expect(slotsOf(state).map((s) => s.status)).toEqual(['ready', 'empty', 'empty', 'empty']);
   });
 });
