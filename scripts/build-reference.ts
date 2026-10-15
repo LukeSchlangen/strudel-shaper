@@ -42,16 +42,16 @@ const MANUAL: Record<string, string> = {
 };
 
 export const CATEGORIES: Array<[string, string[]]> = [
-  ['Sources and combining', ['s', 'note', 'n', 'stack', 'cat', 'seq', 'arrange', 'silence', 'run', 'pick', 'layer', 'superimpose']],
-  ['Signals (continuous 0–1, use with segment/range)', ['sine', 'saw', 'square', 'tri', 'rand', 'perlin', 'irand', 'choose', 'wchoose', 'chooseCycles', 'range', 'segment']],
-  ['Time', ['fast', 'slow', 'hurry', 'early', 'late', 'ply', 'off', 'rev', 'palindrome', 'iter', 'linger', 'chunk', 'zoom', 'inside', 'swingBy', 'swing', 'press']],
-  ['Structure and rhythm', ['struct', 'mask', 'euclid', 'euclidRot', 'beat', 'invert', 'clip', 'legato', 'add', 'sub', 'mul']],
-  ['Variation over cycles', ['every', 'firstOf', 'lastOf', 'when', 'sometimes', 'sometimesBy', 'often', 'rarely', 'someCyclesBy', 'degrade', 'degradeBy', 'scramble', 'shuffle']],
-  ['Layering and space', ['jux', 'juxBy', 'echo', 'echoWith', 'stut', 'pan', 'orbit']],
-  ['Samples', ['bank', 'speed', 'begin', 'end', 'cut', 'chop', 'slice', 'splice', 'loopAt']],
-  ['Level, filters and effects', ['gain', 'velocity', 'lpf', 'lpq', 'hpf', 'hpq', 'bpf', 'vowel', 'crush', 'coarse', 'shape', 'distort', 'room', 'size', 'delay', 'delaytime', 'delayfeedback', 'phaser', 'tremolo']],
-  ['Envelope and synthesis', ['attack', 'decay', 'sustain', 'release', 'adsr', 'vib', 'detune', 'fm']],
-  ['Pitch and harmony', ['scale', 'transpose', 'scaleTranspose', 'voicing', 'chord', 'rootNotes', 'arp']],
+  ['Sources and combining', ['s', 'note', 'n', 'stack', 'cat', 'arrange', 'silence', 'run', 'pick', 'layer', 'superimpose']],
+  ['Signals (continuous 0–1, use with segment/range)', ['sine', 'saw', 'square', 'tri', 'rand', 'perlin', 'choose', 'wchoose', 'range', 'segment']],
+  ['Time', ['fast', 'slow', 'ply', 'off', 'rev', 'iter', 'linger', 'chunk', 'inside', 'swingBy', 'swing', 'press']],
+  ['Structure and rhythm', ['struct', 'mask', 'euclid', 'euclidRot', 'legato', 'add', 'sub', 'mul']],
+  ['Variation over cycles', ['every', 'firstOf', 'lastOf', 'when', 'sometimes', 'sometimesBy', 'often', 'rarely', 'degrade', 'degradeBy', 'scramble', 'shuffle']],
+  ['Layering and space', ['jux', 'juxBy', 'echo', 'echoWith', 'pan']],
+  ['Samples', ['bank', 'speed', 'cut', 'chop', 'slice', 'loopAt']],
+  ['Level, filters and effects', ['gain', 'lpf', 'lpq', 'hpf', 'hpq', 'bpf', 'vowel', 'crush', 'coarse', 'shape', 'distort', 'room', 'delay', 'delaytime', 'delayfeedback']],
+  ['Envelope and synthesis', ['adsr', 'vib', 'detune']],
+  ['Pitch and harmony', ['scale', 'scaleTranspose', 'voicing', 'chord', 'rootNotes', 'arp']],
   ['Tempo, sliders and visuals', ['setcps', 'setcpm', 'slider', '_scope', '_pianoroll']],
 ];
 
@@ -99,22 +99,27 @@ function usableExample(lines: string[], name: string): string | undefined {
   const first = lines.find((l) => l.trim() && !l.startsWith('@'))?.trim();
   if (!first || first.startsWith('//') || /[(,[{]$/.test(first) || !first.includes(name)) return undefined;
   const code = first.replace(/\s*\/\/.*$/, '');
-  return code.length <= 80 ? code : undefined;
+  return code.length <= 56 ? code : undefined;
 }
 
 /** The first sentence, ending at a full stop followed by a capital (so "0 .. 1" doesn't end it). */
 function firstSentence(text: string): string {
   const m = /^(.+?[.!?])\s+(?=[A-Z])/.exec(text);
   const s = (m ? m[1] : text).replace(/[.:]$/, '');
-  return s.length > 90 ? s.slice(0, 87).trimEnd() + '…' : s;
+  return s.length > 64 ? s.slice(0, 61).trimEnd() + '…' : s;
 }
+
+/**
+ * Examples cost ~15 tokens each, so only functions whose call shape isn't obvious from the
+ * signature get one (callbacks, chord/scale strings, signals). The extras have whole examples.
+ */
+const WITH_EXAMPLE = new Set(['pick', 'segment', 'off', 'chunk', 'inside', 'swingBy', 'every', 'firstOf', 'lastOf', 'when', 'sometimesBy', 'jux', 'echoWith', 'superimpose', 'layer', 'euclid', 'struct', 'mask', 'scale', 'voicing', 'chord', 'arp', 'rootNotes', 'chop', 'slice', 'linger', 'ply', 'range']);
 
 function entry(name: string, doc: Doc | undefined): string {
   const sig = `${name}(${doc?.params.join(', ') ?? ''})`;
-  const syn = doc?.synonyms.length ? ` [also ${doc.synonyms.filter((s) => s !== name).join(', ')}]` : '';
   const summary = doc?.summary ? `: ${doc.summary}` : '';
-  const ex = doc?.example ? ` — \`${doc.example}\`` : '';
-  return `- ${sig}${syn}${summary}${ex}`;
+  const ex = doc?.example && WITH_EXAMPLE.has(name) ? ` — \`${doc.example}\`` : '';
+  return `- ${sig}${summary}${ex}`;
 }
 
 export function buildReference(read: (path: string) => string = (p) => readFileSync(root(p), 'utf8')) {
@@ -155,7 +160,8 @@ const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.arg
 if (isMain) {
   const { text, missing, undocumented } = buildReference();
   writeFileSync(root('src/generated/strudel-reference.md'), text);
-  console.log(`wrote src/generated/strudel-reference.md: ${text.length} chars, ~${Math.round(text.length / 4)} tokens`);
+  // Code-heavy text tokenizes at roughly 2.1 characters per token (measured with `npm run count:prompt`).
+  console.log(`wrote src/generated/strudel-reference.md: ${text.length} chars, ~${Math.round(text.length / 2.1)} tokens`);
   if (missing.length) console.warn(`left out (not in the live scope): ${missing.join(' ')}`);
   if (undocumented.length) console.warn(`no JSDoc found (listed by name only): ${undocumented.join(' ')}`);
 }

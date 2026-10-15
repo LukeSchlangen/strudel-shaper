@@ -222,6 +222,12 @@ export class WorkerBackend implements ValidationBackend {
     });
   }
 
+  /** Stops the worker (the eval harness, when it's done). */
+  dispose() {
+    if (this.timer) clearTimeout(this.timer);
+    this.worker.terminate();
+  }
+
   private spawn() {
     this.ready = false;
     this.worker = this.createWorker();

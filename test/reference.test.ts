@@ -23,9 +23,10 @@ describe('build-reference', () => {
   });
 
   it('stays within the prompt budget', () => {
+    // ~2.1 characters per token for this code-heavy text (measured: npm run count:prompt).
     const { text } = buildReference();
-    expect(text.length / 4).toBeLessThan(4500);
-    expect(text.length / 4).toBeGreaterThan(2000);
+    expect(text.length / 2.1).toBeLessThan(5000);
+    expect(text.length / 2.1).toBeGreaterThan(2500);
   });
 
   it('parses JSDoc by @name, by the declaration below it, and with synonyms', () => {
@@ -71,23 +72,26 @@ describe('summariseSounds', () => {
   it('names every common drum and stays compact', () => {
     const first = summary.split('\n')[0];
     for (const d of COMMON_DRUMS.filter((d) => sounds.includes(d))) expect(first).toContain(` ${d}`);
-    expect(summary.length / 4).toBeLessThan(2200);
+    expect(summary.length / 2.1).toBeLessThan(2500);
   });
 
-  it('folds bank aliases into one line', () => {
+  it('folds bank aliases into one entry', () => {
     expect(summary).toMatch(/^ {2}rolandtr909: /m);
     expect(summary).not.toMatch(/^ {2}tr909: /m);
+    expect(summary).not.toMatch(/ tr909( |$)/m);
   });
 
-  it('keeps every loaded sound key reachable from the summary', () => {
-    // Each sound is either named plainly, or appears as `bank: … sound …`, or as a gm_ instrument.
+  it('leaves every loaded sound findable: by name, in a listed bank, by bank name, or by instrument family', () => {
     const text = summary.toLowerCase();
+    const words = new Set(text.split(/[\s:,()"]+/));
     const missing = sounds.filter((s) => {
       const key = soundKey({ s })!;
+      if (words.has(key)) return false;
       const [bank, ...rest] = key.split('_');
-      if (bank === 'gm') return !text.includes(` ${rest.join('_')}`);
-      if (rest.length && new RegExp(`(^|[\\sa-z0-9])${bank}: .*\\b${rest.join('_')}\\b`, 'm').test(text)) return false;
-      return !new RegExp(`(^|[\\s:])${key}(\\s|$)`, 'm').test(text);
+      if (!rest.length) return true;
+      if (bank === 'gm') return !words.has(rest.join('_'));
+      // A drum bank (possibly under its longer alias) or an instrument family `bank_*`.
+      return ![...words].some((w) => w === `${bank}_*` || (w.endsWith(bank) && /^[a-z0-9]+$/.test(w)));
     });
     expect(missing).toEqual([]);
   });

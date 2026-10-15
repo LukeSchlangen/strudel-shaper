@@ -1,0 +1,35 @@
+{
+  "buffers": {
+    "drums": "setcps(0.5)\nstack(\n  s(\"bd*4\"),\n  s(\"~ sd ~ sd\").bank(\"tr909\"),\n  s(\"hh*8\").gain(0.5),\n  s(\"~ ~ ~ oh\").gain(0.4)\n)",
+    "bass": "setcps(0.55)\nstack(\n  s(\"bd*4, ~ cp\"),\n  note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0),\n  s(\"hh*8\").gain(0.4)\n)",
+    "chords": "setcps(0.45)\nstack(\n  chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano1\").room(0.3),\n  note(\"<c2 f2 bb1 eb2>\").s(\"triangle\").gain(0.8),\n  s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\")\n)",
+    "melody": "setcps(0.5)\nstack(\n  n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5),\n  note(\"d2 ~ a1 ~\").s(\"sawtooth\").lpf(500),\n  s(\"bd ~ sd ~, hh*8\")\n)",
+    "effects": "setcps(0.5)\nstack(\n  s(\"bd*2 ~ bd, ~ cp\").room(0.2),\n  note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0.4),\n  s(\"hh*16\").gain(\".6 .3\").pan(sine.fast(2))\n)"
+  },
+  "requests": [
+    { "id": "drums-kick", "buffer": "drums", "selection": "s(\"bd*4\")", "instruction": "" },
+    { "id": "drums-hats-busier", "buffer": "drums", "selection": "s(\"hh*8\").gain(0.5)", "instruction": "busier in the second half" },
+    { "id": "drums-snare-call", "buffer": "drums", "selection": "s(\"~ sd ~ sd\").bank(\"tr909\")", "instruction": "call and response with the kick" },
+    { "id": "drums-drop-hats", "buffer": "drums", "selection": "s(\"hh*8\").gain(0.5)", "instruction": "drop the hats" },
+
+    { "id": "bass-empty", "buffer": "bass", "selection": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0)", "instruction": "" },
+    { "id": "bass-darker", "buffer": "bass", "selection": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0)", "instruction": "darker" },
+    { "id": "bass-halftime", "buffer": "bass", "selection": "note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0)", "instruction": "half-time feel" },
+    { "id": "bass-remove-hats", "buffer": "bass", "selection": "s(\"hh*8\").gain(0.4)", "instruction": "remove the hats" },
+
+    { "id": "chords-empty", "buffer": "chords", "selection": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano1\").room(0.3)", "instruction": "" },
+    { "id": "chords-stabs", "buffer": "chords", "selection": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano1\").room(0.3)", "instruction": "more rhythmic stabs" },
+    { "id": "chords-walk", "buffer": "chords", "selection": "note(\"<c2 f2 bb1 eb2>\").s(\"triangle\").gain(0.8)", "instruction": "walk between the roots" },
+    { "id": "chords-drums", "buffer": "chords", "selection": "s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\")", "instruction": "" },
+
+    { "id": "melody-empty", "buffer": "melody", "selection": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)", "instruction": "" },
+    { "id": "melody-call", "buffer": "melody", "selection": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)", "instruction": "call and response with the kick" },
+    { "id": "melody-syncopated", "buffer": "melody", "selection": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)", "instruction": "more syncopated" },
+    { "id": "melody-drums-halftime", "buffer": "melody", "selection": "s(\"bd ~ sd ~, hh*8\")", "instruction": "half-time feel" },
+
+    { "id": "effects-pad", "buffer": "effects", "selection": "note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0.4)", "instruction": "" },
+    { "id": "effects-pad-darker", "buffer": "effects", "selection": "note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0.4)", "instruction": "darker and wetter" },
+    { "id": "effects-hats-busier", "buffer": "effects", "selection": "s(\"hh*16\").gain(\".6 .3\").pan(sine.fast(2))", "instruction": "busier" },
+    { "id": "effects-mute-pad", "buffer": "effects", "selection": "note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0.4)", "instruction": "mute the pad" }
+  ]
+}

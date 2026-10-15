@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "build:reference": "tsx scripts/build-reference.ts",
     "eval": "node eval/runner.mjs eval/run.ts",
-    "check:key": "node scripts/check-key.mjs"
+    "check:key": "node scripts/check-key.mjs",
+    "count:prompt": "node eval/runner.mjs scripts/count-prompt.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.134.0",

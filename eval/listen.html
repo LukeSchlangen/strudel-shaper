@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shaper Eval Listening</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <style>
+      #listen-bar { display: flex; gap: 10px; align-items: center; padding: 6px 12px; border-bottom: 1px solid #333; font-size: 13px; flex-wrap: wrap; }
+      #listen-bar select, #listen-bar button, #listen-bar input { background: #2a2a2a; color: #ddd; border: 1px solid #444; padding: 3px 6px; }
+      #request-meta { color: #aaa; }
+      #tray .card select { margin-top: 4px; background: #111; color: #ddd; border: 1px solid #444; font-size: 11px; }
+      #notes { width: 100%; background: #111; color: #ddd; border: 1px solid #444; margin-top: 6px; font: 12px ui-monospace, monospace; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>Shaper eval: listen</strong>
+      <button id="play" type="button">▶ Play</button>
+      <button id="stop" type="button">■ Stop</button>
+      <span id="status">Pick a report. N/P next/previous request · 1–4 audition · 0 original · T swap timing</span>
+    </header>
+    <div id="listen-bar">
+      <select id="report"></select>
+      <input id="file" type="file" accept="application/json" title="Or load a report file" />
+      <button id="prev" type="button">◀ P</button>
+      <span id="position"></span>
+      <button id="next" type="button">N ▶</button>
+      <span id="request-meta"></span>
+      <button id="export" type="button">Export notes</button>
+    </div>
+    <main id="editor-wrap"></main>
+    <section id="tray" tabindex="0" aria-label="Options"></section>
+    <script type="module" src="/src/listen.ts"></script>
+  </body>
+</html>

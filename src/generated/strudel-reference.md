@@ -2,138 +2,111 @@
 Names below exist in this Strudel build. Functions are also methods: `s("bd").fast(2)` is the same as `fast(2, s("bd"))`. Most arguments accept a value or a mini-notation string, which patterns them (`.lpf("<400 2000>")`).
 
 ## Sources and combining
-- s(sound) [also sound]: Select a sound / sample by name — `s("bd hh")`
-- note(): Plays the given note name or midi number — `note("c a f e")`
-- n(value): Selects the given index from the sample map — `s("bd sd [~ bd] sd,hh*6").n("<0 1>")`
-- stack() [also polyrhythm, pr]: The given items are played at the same time at the same length — `stack("g3", "b3", ["e4", "d4"]).note()`
-- cat(items) [also slowcat]: The given items are concatenated, where each one takes one cycle — `cat("e5", "b4", ["d5", "c5"]).note()`
-- seq() [also sequence, fastcat]: Like cat, but the items are crammed into one cycle — `seq("e5", "b4", ["d5", "c5"]).note()`
-- arrange(): Allows to arrange multiple patterns together over multiple cycles
-- silence(): Does absolutely nothing. — `silence`
-- run(): A discrete pattern of numbers from 0 to n-1 — `n(run(4)).scale("C4:pentatonic")`
-- pick(pat, xs): Picks patterns (or plain values) either from a list (by index) or a lookup table (by name) — `note("<0 1 2!2 3>".pick(["g a", "e f", "f g f g" , "g c d"]))`
-- layer() [also apply]: Layers the result of the given function(s)
-- superimpose(): Superimposes the result of the given function(s) on top of the original pattern
+- s(sound): Select a sound / sample by name
+- note(): Plays the given note name or midi number
+- n(value): Selects the given index from the sample map
+- stack(): The given items are played at the same time at the same length
+- cat(items): The given items are concatenated, where each one takes one cycle
+- arrange(): Allows to arrange multiple patterns together over multiple cy…
+- silence(): Does absolutely nothing.
+- run(): A discrete pattern of numbers from 0 to n-1
+- pick(pat, xs): Picks patterns (or plain values) either from a list (by index…
+- layer(): Layers the result of the given function(s)
+- superimpose(): Superimposes the result of the given function(s) on top of th…
 
 ## Signals (continuous 0–1, use with segment/range)
-- sine(): A sine signal between 0 and 1 — `n(sine.segment(16).range(0,15))`
+- sine(): A sine signal between 0 and 1
 - saw(): A sawtooth signal between 0 and 1
-- square(): A square signal between 0 and 1 — `n(square.segment(4).range(0,7)).scale("C:minor")`
-- tri(): A triangle signal between 0 and 1 — `n(tri.segment(8).range(0,7)).scale("C:minor")`
+- square(): A square signal between 0 and 1
+- tri(): A triangle signal between 0 and 1
 - rand(): A continuous pattern of random numbers, between 0 and 1
-- perlin(): Generates a continuous pattern of perlin noise, in the range 0..1
-- irand(n): A continuous pattern of random integers, between 0 and n-1
-- choose(xs): Chooses randomly from the given list of elements — `note("c2 g2!2 d2 f1").s(choose("sine", "triangle", "bd:6"))`
-- wchoose(pairs): Chooses randomly from the given list of elements by giving a probability to each element — `note("c2 g2!2 d2 f1").s(wchoose(["sine",10], ["triangle",1], ["bd:6",1]))`
-- chooseCycles() [also randcat]: Picks one of the elements at random each cycle — `chooseCycles("bd", "hh", "sd").s().fast(8)`
-- range(): Assumes a numerical pattern, containing unipolar values in the range 0 .. 1
-- segment(segments) [also seg]: Samples the pattern at a rate of n events per cycle — `note(saw.range(40,52).segment(24))`
+- perlin(): Generates a continuous pattern of perlin noise, in the range…
+- choose(xs): Chooses randomly from the given list of elements
+- wchoose(pairs): Chooses randomly from the given list of elements by giving a…
+- range(): Assumes a numerical pattern, containing unipolar values in th…
+- segment(segments): Samples the pattern at a rate of n events per cycle — `note(saw.range(40,52).segment(24))`
 
 ## Time
-- fast(factor) [also density]: Speed up a pattern by the given factor — `s("bd hh sd hh").fast(2)`
-- slow(factor) [also sparsity]: Slow down a pattern over the given number of cycles — `s("bd hh sd hh").slow(2)`
-- hurry(): Both speeds up the pattern (like 'fast') and the sample playback (like 'speed') — `s("bd sd:2").hurry("<1 2 4 3>").slow(1.5)`
-- early(cycles): Nudge a pattern to start earlier in time — `"bd ~".stack("hh ~".early(.1)).s()`
-- late(cycles): Nudge a pattern to start later in time — `"bd ~".stack("hh ~".late(.1)).s()`
+- fast(factor): Speed up a pattern by the given factor
+- slow(factor): Slow down a pattern over the given number of cycles
 - ply(): The ply function repeats each event the given number of times — `s("bd ~ sd cp").ply("<1 2 3>")`
-- off(time, func): Superimposes the function result on top of the original pattern, delayed by the given time — `"c3 eb3 g3".off(1/8, x=>x.add(7)).note()`
-- rev(): Reverse all cycles in a pattern — `note("c d e g").rev()`
-- palindrome(): Applies `rev` to a pattern every other cycle, so that the pattern alternates between fo… — `note("c d e g").palindrome()`
-- iter(): Divides a pattern into a given number of subdivisions, plays the subdivisions in order,… — `note("0 1 2 3".scale('A minor')).iter(4)`
-- linger(fraction): Selects the given fraction of the pattern and repeats that part to fill the remainder o… — `s("lt ht mt cp, [hh oh]*2").linger("<1 .5 .25 .125>")`
-- chunk() [also slowChunk, slowchunk]: Divides a pattern into a given number of parts, then cycles through those parts in turn… — `"0 1 2 3".chunk(4, x=>x.add(7))`
-- zoom(): Plays a portion of a pattern, specified by the beginning and end of a time span — `s("bd*2 hh*3 [sd bd]*2 perc").zoom(0.25, 0.75)`
+- off(time, func): Superimposes the function result on top of the original patte… — `"c3 eb3 g3".off(1/8, x=>x.add(7)).note()`
+- rev(): Reverse all cycles in a pattern
+- iter(): Divides a pattern into a given number of subdivisions, plays…
+- linger(fraction): Selects the given fraction of the pattern and repeats that pa… — `s("lt ht mt cp, [hh oh]*2").linger("<1 .5 .25 .125>")`
+- chunk(): Divides a pattern into a given number of parts, then cycles t… — `"0 1 2 3".chunk(4, x=>x.add(7))`
 - inside(): Carries out an operation 'inside' a cycle — `"0 1 2 3 4 3 2 1".inside(4, rev).scale('C major').note()`
-- swingBy(subdivision, offset): The function `swingBy x n` breaks each cycle into `n` slices, and then delays events in… — `s("hh*8").swingBy(1/3, 4)`
-- swing(subdivision): Shorthand for swingBy with 1/3 — `s("hh*8").swing(4)`
-- press(): Syncopates a rhythm, by shifting each event halfway into its timespan
+- swingBy(subdivision, offset): The function `swingBy x n` breaks each cycle into `n` slices,… — `s("hh*8").swingBy(1/3, 4)`
+- swing(subdivision): Shorthand for swingBy with 1/3
+- press(): Syncopates a rhythm, by shifting each event halfway into its…
 
 ## Structure and rhythm
 - struct(binary): Applies a rhythm of `x`/`~` (or 1/0) to the pattern — `note("c3 eb3").struct("x ~ x x")`
 - mask(binary): Silences the pattern where the mask is `0`/`~` — `s("hh*8").mask("<1 [0 1]>")`
 - euclid(pulses, steps): Changes the structure of the pattern to form an Euclidean rhythm
 - euclidRot(pulses, steps, rotation): Euclidean rhythm, rotated — `s("hh").euclidRot(3, 8, 2)`
-- beat(): creates a structure pattern from divisions of a cycle especially useful for creating rh… — `s("bd").beat("0,7,10", 16)`
-- invert() [also inv]: Swaps 1s and 0s in a binary pattern — `s("bd").struct("1 0 0 1 0 0 1 0".lastOf(4, invert))`
-- clip(factor) [also legato]: Multiplies the duration with the given number — `note("c a f e").s("piano").clip("<.5 1 2>")`
-- legato(factor) [also ]: Multiplies the duration with the given number — `note("c a f e").s("piano").clip("<.5 1 2>")`
+- legato(factor): Multiplies the duration with the given number
 - add(): Assumes a pattern of numbers
-- sub(): Like add, but the given numbers are subtracted — `n("0 2 4".sub("<0 1 2 3>")).scale("C4:minor")`
-- mul(): Multiplies each number by the given factor — `"<1 1.5 [1.66, <2 2.33>]>*4".mul(150).freq()`
+- sub(): Like add, but the given numbers are subtracted
+- mul(): Multiplies each number by the given factor
 
 ## Variation over cycles
 - every(n, func): Applies `func` every n cycles (from the first) — `s("bd sd").every(4, x => x.fast(2))`
-- firstOf(n, func): Applies the given function every n cycles, starting from the first cycle — `note("c3 d3 e3 g3").firstOf(4, x=>x.rev())`
-- lastOf(n, func): Applies the given function every n cycles, starting from the last cycle — `note("c3 d3 e3 g3").lastOf(4, x=>x.rev())`
-- when(binary_pat, func): Applies the given function whenever the given pattern is in a true state — `"c3 eb3 g3".when("<0 1>/2", x=>x.sub("5")).note()`
-- sometimes(function): Applies the given function with a 50% chance — `s("hh*8").sometimes(x=>x.speed("0.5"))`
+- firstOf(n, func): Applies the given function every n cycles, starting from the… — `note("c3 d3 e3 g3").firstOf(4, x=>x.rev())`
+- lastOf(n, func): Applies the given function every n cycles, starting from the… — `note("c3 d3 e3 g3").lastOf(4, x=>x.rev())`
+- when(binary_pat, func): Applies the given function whenever the given pattern is in a… — `"c3 eb3 g3".when("<0 1>/2", x=>x.sub("5")).note()`
+- sometimes(function): Applies the given function with a 50% chance
 - sometimesBy(probability, function): Randomly applies the given function by the given probability — `s("hh*8").sometimesBy(.4, x=>x.speed("0.5"))`
-- often(): Shorthand for `.sometimesBy(0.75, fn)` — `s("hh*8").often(x=>x.speed("0.5"))`
-- rarely(): Shorthand for `.sometimesBy(0.25, fn)` — `s("hh*8").rarely(x=>x.speed("0.5"))`
-- someCyclesBy(probability, function): Randomly applies the given function by the given probability on a cycle by cycle basis — `s("bd,hh*8").someCyclesBy(.3, x=>x.speed("0.5"))`
-- degrade(): Randomly removes 50% of events from the pattern — `s("hh*8").degrade()`
-- degradeBy(amount): Randomly removes events from the pattern by a given amount. 0 = 0% chance of removal 1… — `s("hh*8").degradeBy(0.2)`
-- scramble(): Slices a pattern into the given number of parts, then plays those parts at random — `note("c d e f").sound("piano").scramble(4)`
-- shuffle(): Slices a pattern into the given number of parts, then plays those parts in random order — `note("c d e f").sound("piano").shuffle(4)`
+- often(): Shorthand for `.sometimesBy(0.75, fn)`
+- rarely(): Shorthand for `.sometimesBy(0.25, fn)`
+- degrade(): Randomly removes 50% of events from the pattern
+- degradeBy(amount): Randomly removes events from the pattern by a given amount. 0…
+- scramble(): Slices a pattern into the given number of parts, then plays t…
+- shuffle(): Slices a pattern into the given number of parts, then plays t…
 
 ## Layering and space
-- jux(): The jux function creates strange stereo effects, by applying a function to a pattern, b… — `s("bd lt [~ ht] mt cp ~ bd hh").jux(rev)`
-- juxBy() [also juxby]: Jux with adjustable stereo width. 0 = mono, 1 = full stereo — `s("bd lt [~ ht] mt cp ~ bd hh").juxBy("<0 .5 1>/2", rev)`
-- echo(times, time, feedback): Superimpose and offset multiple times, gradually decreasing the velocity — `s("bd sd").echo(3, 1/6, .8)`
-- echoWith(times, time, func) [also echowith, stutWith, stutwith]: Superimpose and offset multiple times, applying the given function each time
-- stut(times, feedback, time): Deprecated — `s("bd sd").stut(3, .8, 1/6)`
-- pan(pan): Sets position in stereo — `s("[bd hh]*2").pan("<.5 1 .5 0>")`
-- orbit(number) [also o]: An `orbit` is a global parameter context for patterns
+- jux(): The jux function creates strange stereo effects, by applying… — `s("bd lt [~ ht] mt cp ~ bd hh").jux(rev)`
+- juxBy(): Jux with adjustable stereo width. 0 = mono, 1 = full stereo
+- echo(times, time, feedback): Superimpose and offset multiple times, gradually decreasing t…
+- echoWith(times, time, func): Superimpose and offset multiple times, applying the given fun…
+- pan(pan): Sets position in stereo
 
 ## Samples
-- bank(bank): Select the sound bank to use — `s("bd sd [~ bd] sd").bank('RolandTR909')`
-- speed(speed): Changes the speed of sample playback, i.e. a cheap way of changing pitch — `s("bd*6").speed("1 2 4 1 -2 -4")`
-- begin(amount): A pattern of numbers from 0 to 1
-- end(length): The same as .begin, but cuts off the end off each sample — `s("bd*2,oh*4").end("<.1 .2 .5 1>").fast(2)`
-- cut(group): In the style of classic drum-machines, `cut` will stop a playing sample as soon as anot… — `s("[oh hh]*4").cut(1)`
-- chop(): Cuts each sample into the given number of parts, allowing you to explore a technique kn…
-- slice(): Chops samples into the given number of slices, triggering those slices with a given pat…
-- splice(): Works the same as slice, but changes the playback speed of each slice to match the dura…
-- loopAt(): Makes the sample fit the given number of cycles by changing the speed
+- bank(bank): Select the sound bank to use
+- speed(speed): Changes the speed of sample playback, i.e. a cheap way of cha…
+- cut(group): In the style of classic drum-machines, `cut` will stop a play…
+- chop(): Cuts each sample into the given number of parts, allowing you…
+- slice(): Chops samples into the given number of slices, triggering tho…
+- loopAt(): Makes the sample fit the given number of cycles by changing t…
 
 ## Level, filters and effects
-- gain(amount): Controls the gain by an exponential amount — `s("hh*8").gain(".4!2 1 .4!2 1 .4 1").fast(2)`
-- velocity() [also vel]: Sets the velocity from 0 to 1
-- lpf(frequency) [also cutoff, ctf, lp]: Applies the cutoff frequency of the low-pass filter — `s("bd sd [~ bd] sd,hh*6").lpf("<4000 2000 1000 500 200 100>")`
-- lpq(q) [also resonance]: Controls the low-pass q-value — `s("bd sd [~ bd] sd,hh*8").lpf(2000).lpq("<0 10 20 30>")`
-- hpf(frequency) [also hp, hcutoff]: Applies the cutoff frequency of the high-pass filter — `s("bd sd [~ bd] sd,hh*8").hpf("<4000 2000 1000 500 200 100>")`
-- hpq(q) [also hresonance]: Controls the high-pass q-value — `s("bd sd [~ bd] sd,hh*8").hpf(2000).hpq("<0 10 20 30>")`
-- bpf(frequency) [also bandf, bp]: Sets the center frequency of the band-pass filter — `s("bd sd [~ bd] sd,hh*6").bpf("<1000 2000 4000 8000>")`
+- gain(amount): Controls the gain by an exponential amount
+- lpf(frequency): Applies the cutoff frequency of the low-pass filter
+- lpq(q): Controls the low-pass q-value
+- hpf(frequency): Applies the cutoff frequency of the high-pass filter
+- hpq(q): Controls the high-pass q-value
+- bpf(frequency): Sets the center frequency of the band-pass filter
 - vowel(vowel): Formant filter to make things sound like vowels
-- crush(depth): Bit crusher effect — `s("<bd sd>,hh*3").fast(2).crush("<16 8 7 6 5 4 3 2>")`
-- coarse(factor): Fake-resampling for lowering the sample rate — `s("bd sd [~ bd] sd,hh*8").coarse("<1 4 8 16 32>")`
-- shape(distortion): (Deprecated) Wave shaping distortion — `s("bd sd [~ bd] sd,hh*8").shape("<0 .2 .4 .6 .8>")`
-- distort(distortion, volume, type) [also dist]: Wave shaping distortion — `s("bd sd [~ bd] sd,hh*8").distort("<0 2 3 10:.5>")`
-- room(level): Sets the level of reverb — `s("bd sd [~ bd] sd").room("<0 .2 .4 .6 .8 1>")`
-- size(size) [also rsize, sz]: Sets the room size of the reverb, see `room`
-- delay(level): Sets the level of the delay signal — `s("bd bd").delay("<0 .25 .5 1>")`
+- crush(depth): Bit crusher effect
+- coarse(factor): Fake-resampling for lowering the sample rate
+- shape(distortion): (Deprecated) Wave shaping distortion
+- distort(distortion, volume, type): Wave shaping distortion
+- room(level): Sets the level of reverb
+- delay(level): Sets the level of the delay signal
 - delaytime(seconds) [also delayt, dt]: Time between delay echoes — `s("cp").delay(.5).delaytime(1/8)`
-- delayfeedback(feedback) [also delayfb, dfb]: Sets the level of the signal that is fed back into the delay — `s("bd").delay(.25).delayfeedback("<.25 .5 .75 1>")`
-- phaser(speed) [also ph]: Phaser audio effect that approximates popular guitar pedals
-- tremolo(speed) [also trem]: Modulate the amplitude of a sound with a continuous waveform — `note("d d d# d".fast(4)).s("supersaw").tremolo("<3 2 100> ").tremoloskew("<.5>")`
+- delayfeedback(feedback): Sets the level of the signal that is fed back into the delay
 
 ## Envelope and synthesis
-- attack(attack) [also att]: Amplitude envelope attack time: Specifies how long it takes for the sound to reach its… — `note("c3 e3 f3 g3").attack("<0 .1 .5>")`
-- decay(time) [also dec]: Amplitude envelope decay time: the time it takes after the attack time to reach the sus… — `note("c3 e3 f3 g3").decay("<.1 .2 .3 .4>").sustain(0)`
-- sustain(gain) [also sus]: Amplitude envelope sustain level: The level which is reached after attack / decay, bein… — `note("c3 e3 f3 g3").decay(.2).sustain("<0 .1 .4 .6 1>")`
-- release(time) [also rel]: Amplitude envelope release time: The time it takes after the offset to go from sustain… — `note("c3 e3 g3 c4").release("<0 .1 .4 .6 1>/2")`
-- adsr(time, time, gain, time): ADSR envelope: Combination of Attack, Decay, Sustain, and Release — `note("[c3 bb2 f3 eb3]*2").sound("sawtooth").lpf(600).adsr(".1:.1:.5:.2")`
-- vib(frequency) [also vibrato, v]: Applies a vibrato to the frequency of the oscillator
-- detune(amount) [also det]: Set detune for stacked voices of supported oscillators — `note("d f a a# a d3").fast(2).s("supersaw").detune("<.1 .2 .5 24.1>")`
-- fm(brightness) [also ]: Sets the Frequency Modulation of the synth
+- adsr(time, time, gain, time): ADSR envelope: Combination of Attack, Decay, Sustain, and Rel…
+- vib(frequency): Applies a vibrato to the frequency of the oscillator
+- detune(amount): Set detune for stacked voices of supported oscillators
 
 ## Pitch and harmony
-- scale(scale): Turns numbers into notes in the scale (zero indexed) or quantizes notes to a scale — `n("0 2 4 6 4 2").scale("C:major")`
-- transpose(amount) [also trans]: Change the pitch of each value by the given amount — `"c2 c3".fast(2).transpose("<0 -2 5 3>".slow(2)).note()`
-- scaleTranspose(offset) [also scaleTrans, strans]: Transposes notes inside the scale by the number of steps
+- scale(scale): Turns numbers into notes in the scale (zero indexed) or quant… — `n("0 2 4 6 4 2").scale("C:major")`
+- scaleTranspose(offset): Transposes notes inside the scale by the number of steps
 - voicing(): Turns chord symbols into voicings — `n("0 1 2 3").chord("<C Am F G>").voicing()`
 - chord(symbols): The chord to voice — `chord("<Am C D F Am E Am E>").voicing()`
-- rootNotes(octave): Maps the chords of the incoming pattern to root notes in the given octave — `"<C^7 A7 Dm7 G7>".rootNotes(2).note()`
+- rootNotes(octave): Maps the chords of the incoming pattern to root notes in the… — `"<C^7 A7 Dm7 G7>".rootNotes(2).note()`
 - arp(): Selects indices in in stacked notes
 
 ## Tempo, sliders and visuals
