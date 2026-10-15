@@ -2,7 +2,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import * as core from '@strudel/core';
 import * as mini from '@strudel/mini';
 import { transpiler } from '@strudel/transpiler';
-import { MockProvider, TRANSFORMS, type Sleep } from '../src/mockProvider';
+import { FAULT_KINDS, MockProvider, TRANSFORMS, type FaultKind, type Sleep } from '../src/mockProvider';
+import { Sandbox } from '../src/sandbox';
+import { Validator, type ValidationResult } from '../src/validator';
 import type { Mode, Option, OptionRequest } from '../src/provider';
 import { STARTER_CODE } from '../src/options';
 import { splice } from '../src/splice';
@@ -86,10 +88,10 @@ describe('MockProvider', () => {
     }
   });
 
-  it('fix modes return one unchanged option', async () => {
+  it('fix modes return one option, a musical no-op (unchanged would be dropped as identical)', async () => {
     for (const mode of ['fix-minimal', 'fix-rewrite'] as Mode[]) {
       const opts = await collect(noDelay().generateOptions(request('', mode), new AbortController().signal));
-      expect(opts).toEqual([{ id: expect.any(String), label: 'mock fix', code: HH }]);
+      expect(opts).toEqual([{ id: expect.any(String), label: 'mock fix (no-op)', code: HH + '.fast(1)' }]);
     }
   });
 
@@ -134,4 +136,117 @@ describe('every transform is real Strudel', () => {
       });
     }
   }
+});
+
+describe('faulty mode', () => {
+  const faulty = (opts: Partial<ConstructorParameters<typeof MockProvider>[0]> = {}) =>
+    new MockProvider({ seed: 42, minDelayMs: 0, maxDelayMs: 0, ...opts });
+
+  it('faultRate 0 gives exactly the milestone 2 options and delays', async () => {
+    // Recorded from the milestone 2 mock (commit c1a1fe6^) with seed 42.
+    const delays: number[] = [];
+    const p = new MockProvider({ seed: 42, faultSeed: 999, sleep: async (ms) => void delays.push(Math.round(ms)) });
+    const sets: string[][] = [];
+    for (let r = 0; r < 2; r++) sets.push((await collect(p.generateOptions(request(), new AbortController().signal))).map(suffixOf));
+    expect(sets).toEqual([
+      ['.slow(2)', '.ply(2)', '.fast(2)', '.rev()'],
+      ['.degradeBy(0.3)', '.rev()', '.slow(2)', '.fast(2)'],
+    ]);
+    expect(delays).toEqual([546, 862, 1079, 725, 339, 356, 1092, 471]);
+    expect(p.faultLog).toEqual([]);
+  });
+
+  it('is deterministic for a fixed fault seed, and faultRate 1 breaks every option', async () => {
+    const run = async () => {
+      const p = faulty({ faultRate: 1, faultSeed: 7 });
+      const codes: string[] = [];
+      for (let r = 0; r < 5; r++) codes.push(...(await collect(p.generateOptions(request(), new AbortController().signal))).map((o) => o.code));
+      return { codes, kinds: p.faultLog.map((f) => f.kind) };
+    };
+    const a = await run();
+    expect(a).toEqual(await run());
+    expect(a.kinds).toHaveLength(20);
+    expect(new Set(a.kinds).size).toBeGreaterThan(4);
+  });
+
+  it('faultRate 0.5 breaks roughly half', async () => {
+    const p = faulty({ faultRate: 0.5 });
+    for (let r = 0; r < 25; r++) await collect(p.generateOptions(request(), new AbortController().signal));
+    expect(p.faultLog.length).toBeGreaterThan(30);
+    expect(p.faultLog.length).toBeLessThan(70);
+  });
+
+  it('a forced duplicate with no clean option to copy falls back to the next kind', async () => {
+    const p = faulty({ faultRate: 1, faultKind: 'duplicate' });
+    const opts = await collect(p.generateOptions(request(), new AbortController().signal));
+    // Nothing clean to copy, ever: every option falls back to the next kind.
+    expect(p.faultLog.map((f) => f.kind)).toEqual(['syntax', 'syntax', 'syntax', 'syntax']);
+    expect(opts).toHaveLength(4);
+  });
+
+  it('with feedback: one valid option not issued before', async () => {
+    const p = faulty({ faultRate: 1 });
+    const first = await collect(p.generateOptions(request(), new AbortController().signal));
+    const req = { ...request(), feedback: { previousCode: first[0].code, error: 'syntax: Unexpected token' } };
+    const issued = new Set(first.map((o) => o.code));
+    for (let i = 0; i < 3; i++) {
+      const [replacement, ...rest] = await collect(p.generateOptions(req, new AbortController().signal));
+      expect(rest).toEqual([]);
+      expect(TRANSFORMS.some((t) => replacement.code === HH + t.suffix)).toBe(true);
+      expect(issued.has(replacement.code)).toBe(false);
+      issued.add(replacement.code);
+    }
+    expect(p.faultLog).toHaveLength(4); // only the first request's options
+  });
+
+  it('with feedback and retryFails: broken again', async () => {
+    const p = faulty({ retryFails: true });
+    const req = { ...request(), feedback: { previousCode: 'x', error: 'eval: nope' } };
+    await collect(p.generateOptions(req, new AbortController().signal));
+    expect(p.faultLog.map((f) => f.kind)).toEqual(['syntax']);
+    p.faultKind = 'runtime';
+    await collect(p.generateOptions(req, new AbortController().signal));
+    expect(p.faultLog.map((f) => f.kind)).toEqual(['syntax', 'runtime']);
+  });
+
+  describe('each kind is handled as specified by the validator', () => {
+    let validator: Validator;
+    beforeAll(async () => {
+      const known = new Set(['bd', 'hh', 'sawtooth', 'triangle']);
+      validator = new Validator({ backend: await Sandbox.create(), hasSound: (k) => known.has(k), cps: () => 0.5 });
+    });
+
+    const expected: Record<FaultKind, Partial<ValidationResult>> = {
+      syntax: { ok: false, reason: 'syntax' },
+      'unknown-function': { ok: false, reason: 'eval' },
+      'unknown-sample': { ok: true, warnings: ['unknown-sample'], unknownSounds: ['zzzz'] },
+      runtime: { ok: false, reason: 'query' },
+      // The other lines keep the stack sounding; the empty warning itself is covered in validator.test.ts.
+      empty: { ok: true, warnings: [] },
+      identical: { ok: false, reason: 'identical' },
+      duplicate: { ok: false, reason: 'duplicate' },
+    };
+    const lines = ['s("bd*4")', HH, 'note("c2 [~ c2] eb2 g1").s("sawtooth").lpf(800)'];
+
+    for (const kind of FAULT_KINDS) {
+      for (const line of lines) {
+        it(`${kind} on ${line}`, async () => {
+          // With and without the trailing comma of a whole-line selection, where the buffer has one.
+          for (const text of [line, line + ','].filter((t) => STARTER_CODE.includes(t))) {
+            const from = STARTER_CODE.indexOf(text);
+            const req: OptionRequest = { ...request(), selection: { from, to: from + text.length, text } };
+            // Option 1 is clean (so duplicate has something to copy); option 2 is the fault.
+            const p = faulty({ faultKind: kind });
+            const iter = p.generateOptions(req, new AbortController().signal)[Symbol.asyncIterator]();
+            const clean = (await iter.next()).value as Option;
+            p.faultRate = 1;
+            const broken = (await iter.next()).value as Option;
+            expect(p.faultLog.map((f) => f.kind)).toEqual([kind]);
+            const r = await validator.validate(STARTER_CODE, { from, to: from + text.length }, broken, [clean]);
+            expect(r).toMatchObject(expected[kind]);
+          }
+        });
+      }
+    }
+  });
 });

@@ -8,6 +8,8 @@ export interface OptionRequest {
   instruction: string; // may be empty
   error?: string; // current eval error, if any
   cps: number;
+  /** Set when asking for a replacement for one option that failed validation. */
+  feedback?: { previousCode: string; error: string };
 }
 
 /** `code` replaces the selection only. */
