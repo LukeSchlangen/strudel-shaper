@@ -3,3 +3,4 @@ declare module '@strudel/repl/repl-component.mjs';
 declare module '@strudel/core';
 declare module '@strudel/mini';
 declare module '@strudel/transpiler';
+declare module '@strudel/webaudio';

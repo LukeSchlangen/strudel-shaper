@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { initialState, transition, type TrayEvent, type TrayState } from '../src/trayMachine';
+import { initialState, transition, type Effect, type TrayEvent, type TrayState } from '../src/trayMachine';
+import type { Option } from '../src/provider';
 import type { Capture } from '../src/splice';
 
 const capture: Capture = { range: { from: 2, to: 5 }, text: 'abc', buffer: 'xxabcxx' };
+const opt = (n: number, requestId = 1): Option => ({ id: `r${requestId}-${n}`, label: `opt ${n}`, code: `abc.o${n}()` });
+
+const request: TrayEvent = { type: 'request', requestId: 1, capture, mode: 'shape', instruction: 'busier' };
+const arrive = (n: number, requestId = 1): TrayEvent => ({ type: 'optionArrived', requestId, option: opt(n, requestId) });
+/** Open the tray and let all four options arrive. */
+const ready: TrayEvent[] = [request, arrive(1), arrive(2), arrive(3), arrive(4), { type: 'requestDone', requestId: 1 }];
 
 function run(events: TrayEvent[], start: TrayState = initialState) {
   let state = start;
-  const effects = [];
+  const effects: Effect[] = [];
   for (const e of events) {
     const t = transition(state, e);
     state = t.state;
@@ -15,30 +22,35 @@ function run(events: TrayEvent[], start: TrayState = initialState) {
   return { state, effects };
 }
 
-describe('tray state machine', () => {
-  it('opens on capture with the original heard and no effects', () => {
-    const { state, effects } = run([{ type: 'capture', capture }]);
-    expect(state).toEqual({ kind: 'tray', capture, heard: 0, stale: false });
-    expect(effects).toEqual([]);
+/** Effects after the setup events. */
+function after(setup: TrayEvent[], events: TrayEvent[]) {
+  const base = run(setup);
+  return run(events, base.state);
+}
+
+describe('tray state machine: milestone 1 behaviour', () => {
+  it('opens on request with the original heard, all slots pending, and starts the request', () => {
+    const { state, effects } = run([request]);
+    expect(state).toMatchObject({ kind: 'tray', capture, heard: 0, stale: false, done: false, requestId: 1 });
+    expect(state.kind === 'tray' && state.slots).toEqual(Array(4).fill({ status: 'pending' }));
+    expect(effects).toEqual([{ type: 'startRequest', requestId: 1, capture, mode: 'shape', instruction: 'busier' }]);
   });
 
   it('pauses highlighting once when leaving the original, then swaps options', () => {
-    const { state, effects } = run([
-      { type: 'capture', capture },
+    const { state, effects } = after(ready, [
       { type: 'audition', slot: 1 },
       { type: 'audition', slot: 3 },
     ]);
     expect(state).toMatchObject({ kind: 'tray', heard: 3 });
     expect(effects).toEqual([
       { type: 'pauseHighlight' },
-      { type: 'auditionOption', slot: 1 },
-      { type: 'auditionOption', slot: 3 },
+      { type: 'auditionOption', slot: 1, code: 'abc.o1()' },
+      { type: 'auditionOption', slot: 3, code: 'abc.o3()' },
     ]);
   });
 
   it('re-auditioning the slot already heard does nothing', () => {
-    const { effects } = run([
-      { type: 'capture', capture },
+    const { effects } = after(ready, [
       { type: 'audition', slot: 2 },
       { type: 'audition', slot: 2 },
     ]);
@@ -47,37 +59,27 @@ describe('tray state machine', () => {
 
   it('0 and Esc return to the original and resume highlighting', () => {
     for (const back of [{ type: 'audition', slot: 0 }, { type: 'escape' }] as TrayEvent[]) {
-      const { state, effects } = run([{ type: 'capture', capture }, { type: 'audition', slot: 4 }, back]);
+      const { state, effects } = after(ready, [{ type: 'audition', slot: 4 }, back]);
       expect(state).toMatchObject({ kind: 'tray', heard: 0 });
       expect(effects.slice(-2)).toEqual([{ type: 'evaluateEditor' }, { type: 'resumeHighlight' }]);
     }
   });
 
   it('pressing 0 on the original does not re-evaluate', () => {
-    const { effects } = run([{ type: 'capture', capture }, { type: 'audition', slot: 0 }]);
-    expect(effects).toEqual([]);
+    expect(after(ready, [{ type: 'audition', slot: 0 }]).effects).toEqual([]);
   });
 
   it('Esc on the original closes the tray without evaluating', () => {
-    const { state, effects } = run([
-      { type: 'capture', capture },
-      { type: 'audition', slot: 1 },
-      { type: 'escape' },
-      { type: 'escape' },
-    ]);
+    const { state, effects } = after(ready, [{ type: 'audition', slot: 1 }, { type: 'escape' }, { type: 'escape' }]);
     expect(state).toEqual({ kind: 'playing' });
     expect(effects.filter((e) => e.type === 'evaluateEditor')).toHaveLength(1);
   });
 
   it('follows the 0→1→3→0→4 sequence', () => {
-    const { state, effects } = run([
-      { type: 'capture', capture },
-      { type: 'audition', slot: 0 },
-      { type: 'audition', slot: 1 },
-      { type: 'audition', slot: 3 },
-      { type: 'audition', slot: 0 },
-      { type: 'audition', slot: 4 },
-    ]);
+    const { state, effects } = after(
+      ready,
+      [0, 1, 3, 0, 4].map((slot) => ({ type: 'audition', slot }) as TrayEvent),
+    );
     expect(state).toMatchObject({ kind: 'tray', heard: 4 });
     expect(effects.map((e) => e.type)).toEqual([
       'pauseHighlight',
@@ -91,10 +93,10 @@ describe('tray state machine', () => {
   });
 
   it('Enter commits the heard option, then returns to playing', () => {
-    const t1 = run([{ type: 'capture', capture }, { type: 'audition', slot: 2 }, { type: 'enter' }]);
-    expect(t1.state).toEqual({ kind: 'committed', capture, option: 2 });
+    const t1 = after(ready, [{ type: 'audition', slot: 2 }, { type: 'enter' }]);
+    expect(t1.state).toEqual({ kind: 'committed', capture, option: opt(2) });
     expect(t1.effects.slice(-3)).toEqual([
-      { type: 'commit', capture, option: 2 },
+      { type: 'commit', capture, code: 'abc.o2()' },
       { type: 'evaluateEditor' },
       { type: 'resumeHighlight' },
     ]);
@@ -102,14 +104,13 @@ describe('tray state machine', () => {
   });
 
   it('Enter on the original just closes the tray', () => {
-    const { state, effects } = run([{ type: 'capture', capture }, { type: 'enter' }]);
+    const { state, effects } = after(ready, [{ type: 'enter' }]);
     expect(state).toEqual({ kind: 'playing' });
     expect(effects).toEqual([]);
   });
 
   it('stale returns to the original and blocks further auditions and commit', () => {
-    const { state, effects } = run([
-      { type: 'capture', capture },
+    const { state, effects } = after(ready, [
       { type: 'audition', slot: 3 },
       { type: 'stale' },
       { type: 'audition', slot: 1 },
@@ -119,15 +120,125 @@ describe('tray state machine', () => {
     expect(effects.map((e) => e.type)).toEqual(['pauseHighlight', 'auditionOption', 'evaluateEditor', 'resumeHighlight']);
   });
 
-  it('a failed evaluation falls back to the original', () => {
-    const { state, effects } = run([{ type: 'capture', capture }, { type: 'audition', slot: 1 }, { type: 'evalFailed' }]);
+  it('a failed evaluation marks the card failed and falls back to the original', () => {
+    const { state, effects } = after(ready, [{ type: 'audition', slot: 1 }, { type: 'evalFailed', slot: 1 }]);
     expect(state).toMatchObject({ kind: 'tray', heard: 0, stale: false });
+    expect(state.kind === 'tray' && state.slots[0].status).toBe('failed');
     expect(effects.slice(-2)).toEqual([{ type: 'evaluateEditor' }, { type: 'resumeHighlight' }]);
   });
 
+  it('a failed card can no longer be auditioned', () => {
+    const { effects } = after(
+      [...ready, { type: 'audition', slot: 1 }, { type: 'evalFailed', slot: 1 }],
+      [{ type: 'audition', slot: 1 }],
+    );
+    expect(effects).toEqual([]);
+  });
+
   it('ignores tray keys while playing', () => {
-    for (const e of [{ type: 'audition', slot: 1 }, { type: 'escape' }, { type: 'enter' }, { type: 'stale' }] as TrayEvent[]) {
-      expect(transition(initialState, e)).toEqual({ state: initialState, effects: [] });
-    }
+    const events: TrayEvent[] = [
+      { type: 'audition', slot: 1 },
+      { type: 'escape' },
+      { type: 'enter' },
+      { type: 'stale' },
+      { type: 'regenerate', requestId: 2 },
+      { type: 'externalEval' },
+      arrive(1),
+    ];
+    for (const e of events) expect(transition(initialState, e)).toEqual({ state: initialState, effects: [] });
+  });
+});
+
+describe('tray state machine: streaming', () => {
+  it('auditioning a pending slot does nothing', () => {
+    const { state, effects } = after([request, arrive(1)], [{ type: 'audition', slot: 2 }]);
+    expect(state).toMatchObject({ heard: 0 });
+    expect(effects).toEqual([]);
+  });
+
+  it('fills slots in arrival order', () => {
+    const { state } = run([request, arrive(1), arrive(2)]);
+    expect(state.kind === 'tray' && state.slots.map((s) => s.status)).toEqual(['ready', 'ready', 'pending', 'pending']);
+    expect(state.kind === 'tray' && state.slots[1].option).toEqual(opt(2));
+  });
+
+  it('drops options and completion from an old request', () => {
+    const { state } = run([request, arrive(1, 99), { type: 'requestDone', requestId: 99 }]);
+    expect(state).toMatchObject({ done: false });
+    expect(state.kind === 'tray' && state.slots.every((s) => s.status === 'pending')).toBe(true);
+  });
+
+  it('requestDone turns leftover placeholders empty and records an error', () => {
+    const { state } = run([request, arrive(1), { type: 'requestDone', requestId: 1, error: 'boom' }]);
+    expect(state).toMatchObject({ done: true, error: 'boom' });
+    expect(state.kind === 'tray' && state.slots.map((s) => s.status)).toEqual(['ready', 'empty', 'empty', 'empty']);
+  });
+
+  it('fix modes have a single slot', () => {
+    const { state } = run([{ ...request, mode: 'fix-minimal', instruction: '' } as TrayEvent]);
+    expect(state.kind === 'tray' && state.slots).toHaveLength(1);
+  });
+
+  it('closing with Esc or Enter aborts a request in flight, but not a finished one', () => {
+    expect(after([request], [{ type: 'escape' }]).effects).toEqual([{ type: 'abortRequest' }]);
+    expect(after(ready, [{ type: 'escape' }]).effects).toEqual([]);
+    const commit = after([request, arrive(1), { type: 'audition', slot: 1 }], [{ type: 'enter' }]);
+    expect(commit.effects[0]).toEqual({ type: 'abortRequest' });
+  });
+});
+
+describe('tray state machine: regenerate, new requests and outside evaluation', () => {
+  it('regenerate aborts, restarts with the same instruction and returns to the original', () => {
+    const { state, effects } = after([request, arrive(1), arrive(2), { type: 'audition', slot: 2 }], [
+      { type: 'regenerate', requestId: 2 },
+    ]);
+    expect(state).toMatchObject({ kind: 'tray', requestId: 2, heard: 0, done: false, instruction: 'busier' });
+    expect(state.kind === 'tray' && state.slots.every((s) => s.status === 'pending')).toBe(true);
+    expect(effects).toEqual([
+      { type: 'abortRequest' },
+      { type: 'evaluateEditor' },
+      { type: 'resumeHighlight' },
+      { type: 'startRequest', requestId: 2, capture, mode: 'shape', instruction: 'busier' },
+    ]);
+  });
+
+  it('regenerate after completion does not abort', () => {
+    const { effects } = after(ready, [{ type: 'regenerate', requestId: 2 }]);
+    expect(effects.map((e) => e.type)).toEqual(['startRequest']);
+  });
+
+  it('options from the replaced request are ignored after regenerate', () => {
+    const { state } = after([request, { type: 'regenerate', requestId: 2 }], [arrive(1, 1), arrive(1, 2)]);
+    expect(state.kind === 'tray' && state.slots[0].option).toEqual(opt(1, 2));
+    expect(state.kind === 'tray' && state.slots[1].status).toBe('pending');
+  });
+
+  it('regenerate is blocked while stale', () => {
+    const { state, effects } = after([...ready, { type: 'stale' }], [{ type: 'regenerate', requestId: 2 }]);
+    expect(state).toMatchObject({ requestId: 1, stale: true });
+    expect(effects).toEqual([]);
+  });
+
+  it('stale aborts a request in flight and clears its placeholders', () => {
+    const { state, effects } = after([request, arrive(1)], [{ type: 'stale' }]);
+    expect(effects).toEqual([{ type: 'abortRequest' }]);
+    expect(state.kind === 'tray' && state.slots.map((s) => s.status)).toEqual(['ready', 'empty', 'empty', 'empty']);
+  });
+
+  it('a new request from the tray aborts the old one and starts fresh', () => {
+    const other: Capture = { range: { from: 0, to: 2 }, text: 'xx', buffer: 'xxabcxx' };
+    const { state, effects } = after([request, arrive(1), { type: 'audition', slot: 1 }], [
+      { type: 'request', requestId: 2, capture: other, mode: 'shape', instruction: '' },
+    ]);
+    expect(state).toMatchObject({ kind: 'tray', capture: other, requestId: 2, heard: 0, stale: false });
+    expect(effects.map((e) => e.type)).toEqual(['abortRequest', 'evaluateEditor', 'resumeHighlight', 'startRequest']);
+  });
+
+  it('an outside evaluation closes the tray without re-evaluating', () => {
+    const heard = after([request, arrive(1), { type: 'audition', slot: 1 }], [{ type: 'externalEval' }]);
+    expect(heard.state).toEqual({ kind: 'playing' });
+    expect(heard.effects).toEqual([{ type: 'abortRequest' }, { type: 'resumeHighlight' }]);
+    const original = after(ready, [{ type: 'externalEval' }]);
+    expect(original).toEqual({ state: { kind: 'playing' }, effects: [] });
   });
 });
