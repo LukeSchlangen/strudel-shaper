@@ -164,7 +164,7 @@ Everything below was checked in Chrome on macOS against `npm run dev`, with keys
 - Shape mode streams 4 distinct options. Each appends one transform to the selection. All 7 were confirmed in `node_modules/@strudel/core`: `fast` (`pattern.mjs:1925`), `slow` (`:1958`), `ply` (`:1905`), `off` (`:2236`), `rev` (`:2259`), `jux` (`:2379`), and `degradeBy` (`signal.mjs:699`). `test/mockProvider.test.ts` evaluates every transform on the kick, hi-hat and bass expressions, spliced into the starter buffer, with the real transpiler.
 - Keyword bias: `sparser|calmer|sparse|calm|less` → degradeBy/slow first; `busier|denser|busy|dense` → fast/ply/off first. Sparser is checked first, so "less busy" reads as sparser. Any other instruction, or none, gives a seeded shuffle.
 - The seed is `seed + requestCount`, so R (regenerate) gives a new set and tests stay deterministic. Each option waits a seeded 300–1200 ms; tests use 0.
-- Fix modes return one option, the selection unchanged, labelled "mock fix".
+- Fix modes return one option, the selection unchanged, labelled "mock fix". (**Milestone 3:** now the selection + `.fast(1)`, "mock fix (no-op)", because an unchanged option is dropped as identical.)
 - The transform goes **before** any trailing whitespace, `,` or `;` in the selection. A whole-line selection used to produce `s("hh*8").gain(0.6),.fast(2)`, a syntax error (reported by the user, fixed in `d7cfdfa`).
 - Abort: the sleep resolves early on abort and the generator returns without yielding again.
 
@@ -181,7 +181,7 @@ Everything below was checked in Chrome on macOS against `npm run dev`, with keys
 | --- | --- | --- |
 | Shape selection | ⌘/Ctrl+K | ✅ opens the box; capture phase, so CodeMirror's Ctrl-K `deleteToLineEnd` never runs |
 | Minimal fix | ⌘/Ctrl+J | ✅ opens the tray straight away (no instruction box), mode `fix-minimal` |
-| Intent rewrite | ⌘/Ctrl+⇧J | ✅ opens the tray straight away, mode `fix-rewrite` |
+| Intent rewrite | ⌘/Ctrl+⇧J | ✅ opens the tray straight away, mode `fix-rewrite` (**milestone 3:** now opens the instruction box first) |
 | Audition | 1–4 (tray focused) / ⌥1–4 (anywhere) | ✅ ⌥ uses `e.code` (`Digit2`), since macOS ⌥2 types "™". Confirmed nothing is typed into the editor |
 | Back to original | 0 or Esc (⌥0 too) | ✅ Esc also works from the editor while the tray is open, unless an autocomplete popup is showing. A second Esc closes |
 | Commit heard option | Enter (tray focused) | ✅ |
@@ -277,3 +277,166 @@ Use headphones. Reload, and **don't click**. Press ⌘K, then Esc, then Ctrl+Ent
 - **The Drawer's look-back after settling.** Once a swap has landed, `settle()` swaps the stitched wrapper for the plain new pattern, so a Drawer query reaching back before `N` would see the new pattern. Highlighting only shows the present, so nothing visible changes; a painter using `drawTime[0] < 0` (e.g. `pianoroll`) could repaint the last ≤1 cycle with the new pattern.
 - **Fix modes skip the instruction box.** ⌘⇧J (intent rewrite) might want one once real models exist; `startCapture` in `main.ts` is the one place to change.
 - **Widgets during audition** (from milestone 1) are still not handled.
+
+---
+
+# Milestone 3 notes: the validation pipeline
+
+**No option reaches a card until it has been evaluated and queried silently, in a separate realm.** Checked in Chrome on macOS against `npm run dev` (keys via the Claude in Chrome extension, as in milestone 2). `npm test` (166 tests) and `npm run build` pass. `npm ls` still shows one copy each of `@codemirror/state`, `@codemirror/language` and `@strudel/core`. The worker bundle necessarily has its own copy of core (see below).
+
+## Where things live
+
+| File | What |
+| --- | --- |
+| `src/sandbox.ts` | The isolated evaluator: a private, never-started `repl()`, the stubs, and the snapshot/restore of globals |
+| `src/validator.worker.ts` | The worker entry: `init` (stubs) → `ready`, then one `check` at a time |
+| `src/validator.ts` | `Validator.validate(buffer, range, option, others)` (the brief's API), `normalizeCode`, `WorkerBackend` (queue + 250 ms pre-emptive timeout), `VALIDATION_TIMEOUT_MS` |
+| `src/pipeline.ts` | `runRequest`: stream → validate in arrival order → one retry with feedback per slot → tray events |
+| `src/mockProvider.ts` | `faultRate`, `faultSeed`, `faultKind`, `retryFails`, `faultLog` |
+| `src/trayMachine.ts` | Slots: `pending · validating · retrying · ready · dropped · failed · empty` |
+| `src/main.ts` | Wiring, rendering, dev controls, `__shaper.soak()` and `__shaper.measure(n, { validate })` |
+
+## How Strudel evaluates, and why validation needs its own realm
+
+- `core.evaluate` (`@strudel/core/evaluate.mjs`) transpiles, then runs the code with `Function()` against **`globalThis`**. Every Strudel name is a global installed by `evalScope` (which also fills `strudelScope`).
+- `setcps`/`setCps`/`setcpm`/`setCpm`, `hush`, `all`, `each`, `cpm` and `Pattern.prototype.p/q/d1–9/p1–9/q1–9` are **closures over one `repl()`'s scheduler and pattern table**. `repl.evaluate` re-installs them on every call (`injectPatternMethods`, `repl.mjs`). So "how `setcps` reaches the scheduler" is: the global `setcps` is whichever repl last evaluated. A second repl on the main thread would take over those globals during the live repl's `await` gaps, and the live code's `setcps` could land on the wrong scheduler. **The main thread can't be made safe by swapping globals around a check.**
+- `@strudel/core`, `mini`, `tonal` and `transpiler` load and run **without `window`/`document`** (verified in Node and in the worker). `Cyclist.setPattern(p, false)` never starts the clock (`cyclist.mjs:123`).
+- **`Pattern.queryArc` swallows query errors** (`pattern.mjs:414-420`: it logs `[query] error` and returns `[]`). The live scheduler would just play silence for that tick. The query stage therefore calls `pattern.query(new State(new TimeSpan(0, 2)))` directly.
+- Mini-notation errors (`s("hh*8[")`) are thrown by the **transpiler**, so they count as `syntax`. Most bad arguments (`.fast("x")`, `.scale("Q:nope")`, `.segment("x")`) don't throw at all: they just produce 0 onsets.
+
+## Worker decision: validation runs in a Web Worker
+
+The worker is a separate realm with its own `globalThis`, `Pattern.prototype` and a private `core.repl()`. It has no DOM, no AudioContext and no `soundMap`, so a check **cannot** reach the live scheduler, tempo, pattern, editor or sound map. Strudel's own `repl.evaluate(code, /*autostart*/ false)` handles `$:`, `hush`, `all`, `each`, `setcps` and `cpm` exactly as live, but against the private scheduler (its cps is set to the live cps before each check, so `.cpm()` matches).
+
+It is also the only place a runaway check can be stopped. `WorkerBackend` starts a 250 ms timer per check. If the timer fires, it `terminate()`s the worker, spawns a new one and sends the stub list again. Verified: `s("hh*8").fast(1e9)` → `timeout` at 250 ms, `respawns: 1`, and the next check passed.
+
+Costs: one module worker (524 kB in the build: core, mini, tonal, transpiler) and its own copy of `@strudel/core` (unavoidable for a separate realm; `npm ls` is unaffected). `vite.config.ts` sets `worker.format: 'es'`.
+
+### What is stubbed, and why
+
+The worker loads **core, mini, tonal and transpiler for real**. After the live `prebake` resolves, the main thread sends the names live code can call: `Object.keys(strudelScope)` filtered to those defined on `globalThis`, plus the own function names on `Pattern.prototype`. The worker stubs the ones it doesn't have. These come from modules that need the DOM, AudioContext, network or MIDI. Measured: **185 globals and 38 methods**.
+
+- **Globals → `() => silence`** (each call is recorded in `sandbox.stubCalls`):
+  - `@strudel/webaudio` + superdough (the reason the sound map can't change: these are no-ops here): `samples`, `registerSound`, `registerSynthSounds`, `registerZZFXSounds`, `registerSampleSource`, `registerSamplesPrefix`, `registerWaveTable`, `registerWorklet`, `aliasBank`, `soundAlias`, `soundMap`, `resetLoadedSounds`, `setDefault`, `setDefaultValue(s)`, `resetDefaults`, `resetDefaultValues`, `setVersionDefaults`, `setGainCurve`, `setMaxPolyphony`, `setMultiChannelOrbits`, `initAudio`, `initAudioOnFirstClick`, `getAudioContext`, `setAudioContext`, `setDefaultAudioContext`, `superdough`, `superdoughTrigger`, `webaudioOutput`, `webaudioRepl`, `loadBuffer`, `getSound`, `fetchSampleMap`, `processSampleMap`, `connectToDestination`, `analysers`, `getAnalyserById`, `drawTimeScope`, `drawFrequencyScope`, `dough`, `doughsamples` and about 60 more node and envelope helpers (`getOscillator`, `getEnvelope`, `getLfo`, …).
+  - `@strudel/draw`: `pianoroll`, `drawPianoroll`, `__pianoroll`, `getDrawContext`, `cleanupDraw`, `Drawer`, `Framer`, `getTheme`, `setTheme`, `pitchwheel`, `getPunchcardPainter`, `colorMap`, `rescale`, `moveXY`, `zoomIn`, `x`, `y`, `w`, `r`, `angle`, `fill`, …
+  - `@strudel/codemirror`: `StrudelMirror`, `initEditor`, `flash`, `highlightMiniLocations`, `updateMiniLocations`, `updateWidgets`, `updateSliderWidgets`, `registerWidget`, `settings`, `themes`, `toggleComment`, … **Exception: `slider` and `sliderWithID` return `pure(value)`**, so `.gain(slider(0.6))` still sounds. The transpiler rewrites `slider(v)` to `sliderWithID(id, v, …)`.
+  - `@strudel/hydra`: `H`, `initHydra`, `clearHydra`
+  - `@strudel/soundfonts`: `registerSoundfonts`, `loadSoundfont`, `setSoundfontUrl`, `soundfontList`, `getFontBufferSource`, `startPresetNote`
+  - `@strudel/midi`: `midin`, `WebMidi`, `enableWebMidi`, `midimaps`, `defaultmidimap`, `midicontrolMap`, `midikeys`, `midisoundMap`
+- **`Pattern.prototype` methods → `function () { return this }`** (all 38): `draw onPaint getPainters animate x y w h angle r fill rescale _rescale moveXY _moveXY zoomIn _zoomIn pianoroll punchcard wordfall spiral pitchwheel supradough dough fscope tscope scope spectrum _pianoroll _punchcard _spiral _scope _pitchwheel _spectrum markcss piano soundfont midi`
+- **Not stubbed, provided for real by the worker's own repl:** `setcps`, `setCps`, `setcpm`, `setCpm`, `hush`, `all`, `each`, `cpm`, `compileKabel`, `.p`/`.q`/`d1–9`/`p1–9`/`q1–9`.
+- **Gotcha found:** `density`, `plywith` and `plyforeach` are in the live `strudelScope` but **not on the live `globalThis`**. Core exports them twice internally (e.g. `density` is both a `fast` synonym and a control), so `export *` drops the ambiguous names. Stubbing them would have made validation accept code the live repl rejects, so names are filtered by `globalThis`. `density(2, pat)` is now `eval: density is not defined`, as live.
+- **Between checks**, the worker restores the own keys of `globalThis` and `Pattern.prototype` to a post-init snapshot. A `register('foo', …)` or `globalThis.x = …` in one option can't leak into the next check (tested).
+
+### Proving the live session is untouched
+
+- `test/sandbox.test.ts` runs the sandbox in the **same** realm as a stand-in live repl (the harder case) on a buffer with `setcps(1)`, `samples(…)`, `registerSound(…)`, `register('wobble', …)`, `hush()` and `.pianoroll()`. The live cps stays 0.5, the live pattern stays the same object, the sound list is unchanged, `wobble` is gone afterwards, and the live repl's next `setcps(0.7)` still reaches its own scheduler.
+- In the browser, `measure(n, { validate: true })` snapshots the live state before and after. Every other validation batch splices into a buffer whose `setcps(0.5)` was changed to **`setcps(1)`** (thousands of such checks per run). Results are below.
+
+## Validator stages (`Validator.validate`)
+
+1. Splice into the **current** buffer at the **current** (stale-guard-mapped) range: `runRequest` reads `getBuffer()`/`getRange()` when each validation runs, not when the option arrived (tested).
+2. **identical**: `normalizeCode(option) === normalizeCode(selection)`.
+3. **duplicate**: against options already **accepted** in this request, in arrival order.
+4. **syntax**: `transpiler()` throws (JS syntax *and* mini-notation).
+5. **eval**: `repl.evaluate` returns `undefined` (thrown), or `silence` (repl's substitute for "no pattern", e.g. a buffer that is only `setcps(1)`).
+6. **query**: `pattern.query(State(TimeSpan(0, 2)))` throws. Onsets are counted.
+7. **Warnings**, judged by the **option's own events**: haps carry their mini-notation source locations, and onsets whose location starts inside the spliced option are the option's. This was found in the browser: with whole-buffer counting, `.degradeBy(1)` on one stack line never warned, because the kick and bass keep sounding. If the option has no mini-notation (e.g. `sound(seq('hh','hh'))`), it falls back to the whole buffer (`eventScope: 'buffer'`). `empty` = 0 onsets. `unknown-sample` = a sound key not in the live `soundMap` (read only), keyed like superdough: `bank_s` lowercased, `:n` stripped, rests skipped, no `s` → `triangle`.
+8. **timeout**: more than `VALIDATION_TIMEOUT_MS = 250` ms. The worker backend pre-empts; the in-process sandbox (tests) checks after the fact.
+
+`normalizeCode`: outside strings, whitespace disappears (one space is kept between two word characters). Inside `"…"`, `'…'` and `` `…` ``, runs collapse to one space and are trimmed. So `s( "hh*8" ) .gain( 0.6 )` is identical to `s("hh*8").gain(0.6)`, but `"hh hh"` ≠ `"hhhh"`.
+
+## Retry with feedback (`src/pipeline.ts`)
+
+- `OptionRequest.feedback?: { previousCode, error }`; nothing else changed.
+- Every first failure (`syntax`/`eval`/`query`/`timeout`/`identical`/`duplicate`) gets **one** replacement request for that slot, with the current buffer and range. The feedback is `syntax: Unexpected token (6:1)`, `unknown function: s(...).wobble is not a function`, … or, in plain words, "This option is the same as the original selection. Suggest a different variation." / "This option is the same as option 2. …". If the replacement fails too, the slot is dropped for good.
+- Retries start immediately and run alongside the rest of the stream. Validation stays serial and in arrival order. Everything honours the request's `AbortSignal`: nothing is emitted after an abort (tested mid-retry). Events carry the request id, and the machine ignores stale ones. `requestDone` is sent only when the stream has ended and every validation and retry has settled.
+- Two mock bugs that parallel retries exposed (both fixed and tested): a replacement could pick a transform the stream had *planned* but not yet yielded, and two concurrent replacements could pick the same one. Both showed up as permanent `duplicate` drops.
+
+## Faulty mock
+
+| Kind | What it produces (trailing `,`/`;` kept) | Handled as |
+| --- | --- | --- |
+| `syntax` | `….fast(2` or the first string's closing quote removed | dropped → retried |
+| `unknown-function` | `….wobble(2)` | `eval` ("unknown function") → retried |
+| `unknown-sample` | `s("zzzz*4")` | **warning** `unknown sample: zzzz`, playable |
+| `runtime` | `….fmap(v => v.velocity.toFixed(2))`: transpiles and evaluates, **throws only when queried** (no event has a velocity; confirmed on all three lines). `.sometimesBy(0.5, x => x.wobble(2))` also throws only at query. | `query` → retried |
+| `empty` | `….degradeBy(1)` | **warning** `empty`, playable |
+| `identical` | the selection with an extra space (`s( "hh*8")…`) | dropped → retried |
+| `duplicate` | an earlier *clean* option with an extra space (falls back to the next kind if there isn't one) | dropped → retried |
+
+- Faults use their own prng stream (`faultSeed`, default `seed`). At `faultRate = 0` the options and delays are **exactly** milestone 2's (pinned in a test against output recorded from the milestone 2 mock).
+- With `feedback`, the mock returns one valid transform not yet planned or issued for this request. With `retryFails`, it returns a fault (`faultKind` or `syntax`). Since there are only 7 transforms, a request with 4 planned options and 4 retries can run out; the last replacement is then a duplicate and is dropped. This happened once in 30 requests.
+- **Turning it on (dev only):** `http://localhost:5173/?faultRate=0.5` plus optionally `&fault=syntax|unknown-function|unknown-sample|runtime|empty|identical|duplicate`, `&retryFails=1` and `&seed=123`. Live: `__shaper.mock.faultRate = 0.5`, `__shaper.mock.faultKind = 'runtime'`, `__shaper.mock.retryFails = true`. The status line then reads `provider: mock (faults 50%)`.
+
+## Tray
+
+- Cards appear only after validation. Placeholders read `waiting for option` → `validating…` → (`retrying… (syntax)`) → the card, or `dropped: unknown function` with the full message in the hover title.
+- Cards with warnings show a badge (`empty`, `unknown sample: zzzz`) and can still be auditioned. A replacement shows a blue `retried` badge, and its title names what it replaced.
+- Status line: `provider: mock (faults 60%) · first 1.1 s · last 3.4 s · 4 ok · 1 retried · 0 dropped · validation 4.4 ms avg / 8.4 ms max · audition: off (original) · swap: beat (T)`. first/last now mean the first card *shown* and the last slot settled. Provider arrival times are logged as `[shaper] request timing`.
+- The audition-time `failed` state stays as a backstop. It was never reached in any soak.
+- ⌘⇧J opens the instruction box (empty is fine) and then requests `fix-rewrite`; ⌘J still goes straight to the tray. Both verified.
+
+## Measurements (Chrome, cps 0.5)
+
+### Exit-criteria soak: `await __shaper.soak({ requests: 36, faultRate: 0.5, seed: 77 })`
+Kick, hi-hat and bass lines in turn, through the real tray. Every card that appeared was auditioned on the live repl (immediate swaps).
+
+| Requests | Options | Faults | Kinds seen | Live auditions | **Failed cards** | **Hard faults accepted** |
+| --- | --- | --- | --- | --- | --- | --- |
+| 36 | 192 | 70 | 7 / 7 | 144 | **0** | **0** |
+
+```
+syntax            10× retried after syntax → replacement accepted
+unknown-function  10× retried after unknown function → replacement accepted
+runtime           10× retried after query error → replacement accepted
+identical         11× retried after identical → replacement accepted
+duplicate          6× retried after duplicate → replacement accepted
+empty             12× warned (empty); 1× retried after duplicate → replacement accepted
+unknown-sample    10× warned (unknown-sample)
+```
+(The one "empty → duplicate" was a second `degradeBy(1)` in the same request.) An earlier 30-request run (seed 11) gave the same picture: 169 options, 68 faults, 7/7 kinds, 119 auditions, 0 failed, and 1 permanent drop from the mock running out of transforms.
+
+`retryFails` run (12 requests): every retried slot was **dropped for good**, with 0 failed cards and 0 hard faults accepted. Under `retryFails` the broken replacements are themselves logged as `syntax` faults, which shows as "dropped for good: syntax" rows.
+
+### Audio during validation: `measure(n, { validate: true })`
+Background load: batches of 4 faulty-mock options validated **back to back** against the live buffer for the whole run, every other batch with `setcps(1)`. That is far more than 4 per request, about 1,800–2,000 checks per second.
+
+| Run | Swaps / landed | Onsets played / expected | Missing | Extra | Kicks | Kick gaps | Checks (`setcps(1)` batches) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| beat | 12 / 11 | 102 / 102 | 0 | 0 | 22 | all 0.500 s | 21,213 (3,413) |
+| immediate | 12 / 12 | 90 / 90 | 0 | 0 | 18 | all 0.500 s | 18,487 (2,975) |
+| hold 20 s, no swaps | 0 | 161 / 161 | 0 | 0 | 40 | all 0.500 s | 39,749 (6,381) |
+| hold 10 s (final code) | 0 | 83 / 83 | 0 | 0 | 21 | all 0.500 s | 17,727 (2,834) |
+
+Isolation, every run: **cps 0.5 → 0.5**, anchor kept, editor text kept, `soundMap` kept (1650 sounds, same key hash), main-realm `Pattern.prototype` and live `setcps` kept, 0 timeouts. In the no-swap hold the live pattern is the **same object** throughout. (One hold reported `patternKept: false`: an Esc just before it had re-evaluated the original in beat mode, and the Quantizer's `settle()` replaced its stitched wrapper mid-run. Re-run once settled: `true`.)
+
+### Validation time per option
+- Warm worker, hot loop: **0.26–0.29 ms average**, p95 0.4 ms, max 1.2–1.5 ms (13 ms once). Event counts track the code, so this is real work (`hh*9` → 18 onsets in 2 cycles), with a 0.5 ms main-thread round trip.
+- Inside a real request (the worker idle between options): **4–6 ms per option**. The first check after a page load took 7.6 ms.
+- `faultRate = 0`, 6 requests: each card appears **3–9 ms** after the provider's option arrives (first card 338 ms vs 332 ms raw, …). Otherwise milestone 2 behaviour is unchanged: same options, same delays, 4 cards. Fix modes now show the `.fast(1)` no-op.
+
+## Listening checklist (milestone 3)
+
+Use headphones. Open `/?faultRate=0.5`, press ⌘K → Esc, then Ctrl+Enter.
+
+- [ ] Put the cursor on the hi-hat line, ⌘K, Enter. Placeholders go `waiting for option` → `validating…`, some `retrying… (syntax)` and similar, then cards. **Nothing broken is ever a card.**
+- [ ] The status line shows `n ok · n retried · n dropped · validation x ms avg / y ms max` and `provider: mock (faults 50%)`.
+- [ ] Throughout the request (and pressing R a few times), the kick never stumbles and the tempo never changes.
+- [ ] A card with an `empty` badge plays: the hats go silent, and kick and bass continue. A card with `unknown sample: zzzz` plays: the hats go silent and the console logs a missing sound. Neither hiccups.
+- [ ] A `retried` card plays like any other. Hover it to see what it replaced.
+- [ ] `__shaper.mock.retryFails = true`, then R: some slots end `dropped: syntax` (hover for the message) and can't be auditioned.
+- [ ] `__shaper.mock.faultKind = 'runtime'; __shaper.mock.faultRate = 1`, then R: every slot shows `retrying… (query error)` and fills with a replacement.
+- [ ] Edit the first line to `setcps(1)` **without evaluating**, then ⌘K on the hi-hat line, Enter, and audition cards. Validation sees `setcps(1)` in the buffer but the tempo doesn't change. (Auditioning a card *does* evaluate the buffer, including `setcps(1)`, so the tempo then doubles. That's expected live behaviour, not validation.)
+- [ ] Reload with no query string: cards look and play as in milestone 2, a few ms later.
+- [ ] Physical ⌘⇧J on a line opens the instruction box. Enter gives a one-card "mock fix (no-op)" tray. Physical ⌘J goes straight to the tray.
+
+## Open problems
+
+- **An error elsewhere in the buffer fails every option.** The whole spliced buffer is checked, so a broken line 3 makes every option for line 4 fail on that line 3 error. Each one is retried, then dropped, with an accurate message. Fix: check the unmodified buffer once per request, and if it fails the same way, report "the buffer itself fails" instead of blaming the options.
+- **Validated against the buffer at validation time.** Edits elsewhere *after* a card is validated aren't re-checked; the audition-time `failed` state is the backstop.
+- **Stub fidelity.** Stubbed draw/webaudio/codemirror/hydra/midi calls are assumed valid (wrong arguments to them aren't caught). `await samples(...)` resolves to `silence`. Sounds that a `samples()` call *in the option* would load show as `unknown sample`. `.piano()` (defined by the repl's prebake) is a pass-through, so its notes default to `triangle`.
+- **"No pattern" is `=== silence`.** A buffer that is *only* `hush()` or `silence` is dropped as `eval`, though it is arguably a legitimate choice.
+- **Option-scoped events need mini-notation** in the option. Options built only from single-quoted strings, numbers or signals fall back to whole-buffer counting, where an empty option inside a sounding stack isn't flagged.
+- **Mock exhaustion**: with 7 transforms, 4 planned options plus 4 retries in one request can't all be distinct. Real providers won't have this limit.
+- **Worker memory**: one worker for the page's lifetime, replaced after a timeout. The pre-emption is verified, but not long sessions (hours).
