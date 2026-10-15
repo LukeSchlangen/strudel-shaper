@@ -8,13 +8,13 @@ import { commitSpec } from './commit';
 import { diffSegments } from './diff';
 import { InstructionBox } from './instructionBox';
 import { InstructionHistory } from './instructionHistory';
-import { MockProvider } from './mockProvider';
+import { FAULT_KINDS, MockProvider, type FaultKind } from './mockProvider';
 import { STARTER_CODE } from './options';
-import { runRequest } from './pipeline';
+import { reasonLabel, runRequest } from './pipeline';
 import type { Mode, OptionRequest, Provider } from './provider';
 import { Quantizer } from './quantize';
 import { isRangeIntact, mapRange, splice, type Capture, type Edit, type Range } from './splice';
-import { initialState, slotCount, transition, type Effect, type Slot, type TrayEvent, type TrayState } from './trayMachine';
+import { initialState, slotCount, transition, type Effect, type Slot, type SlotCard, type TrayEvent, type TrayState } from './trayMachine';
 import { Validator, WorkerBackend, type WorkerLike } from './validator';
 
 // --- Strudel wiring -------------------------------------------------------------------------
@@ -35,7 +35,24 @@ const trayEl = document.getElementById('tray')!;
 document.getElementById('play')!.addEventListener('click', () => mirror.evaluate());
 document.getElementById('stop')!.addEventListener('click', () => mirror.stop());
 
-let provider: Provider = new MockProvider({ seed: Date.now() >>> 0 });
+let provider: Provider = new MockProvider({ seed: Date.now() >>> 0, ...devMockOptions() });
+
+/**
+ * Dev only: `?faultRate=0.5&fault=syntax&retryFails=1&seed=123` turns on the mock's faulty mode.
+ * `__shaper.mock` changes faultRate / faultKind / retryFails on the fly.
+ */
+function devMockOptions() {
+  if (!import.meta.env.DEV) return {};
+  const q = new URLSearchParams(location.search);
+  const fault = q.get('fault') as FaultKind | null;
+  if (fault && !FAULT_KINDS.includes(fault)) console.warn(`[shaper] unknown fault kind "${fault}"; one of ${FAULT_KINDS.join(', ')}`);
+  return {
+    ...(q.has('seed') ? { seed: Number(q.get('seed')) } : {}),
+    faultRate: Math.min(1, Math.max(0, Number(q.get('faultRate') ?? 0) || 0)),
+    faultKind: fault && FAULT_KINDS.includes(fault) ? fault : undefined,
+    retryFails: q.get('retryFails') === '1',
+  };
+}
 
 // --- Validation -------------------------------------------------------------------------------
 
@@ -56,7 +73,11 @@ Promise.resolve(mirror.prebaked)
     const methods = Object.getOwnPropertyNames(Pattern.prototype).filter(
       (name) => typeof Object.getOwnPropertyDescriptor(Pattern.prototype, name)?.value === 'function',
     );
-    backend.init({ globals: Object.keys(strudelScope), methods });
+    // Only names live code can actually call: user code resolves against globalThis, and some scope
+    // entries never reach it (density, plywith, plyforeach are exported twice inside core, so
+    // `export *` drops them). Stubbing those would let the worker accept code the live repl rejects.
+    const globals = Object.keys(strudelScope).filter((name) => (globalThis as any)[name] !== undefined);
+    backend.init({ globals, methods });
   });
 
 // --- Audio on the first keypress ---------------------------------------------------------------
@@ -285,6 +306,7 @@ async function streamOptions(effect: Extract<Effect, { type: 'startRequest' }>, 
         if (event.type === 'requestDone') {
           console.log('[shaper] request timing', { ...times, provider: provider.name });
         }
+        soakLog?.push(event);
         send(event);
       },
     },
@@ -309,8 +331,9 @@ function startCapture(mode: Mode) {
   }
   const buffer = view.state.doc.toString();
   const cap: Capture = { range, text: buffer.slice(range.from, range.to), buffer };
-  if (mode === 'shape') box.open(range, (instruction) => submit(cap, mode, instruction));
-  else submit(cap, mode, '');
+  // Minimal fix goes straight to the tray; shape and intent rewrite ask for an instruction (empty is fine).
+  if (mode === 'fix-minimal') submit(cap, mode, '');
+  else box.open(range, (instruction) => submit(cap, mode, instruction));
 }
 
 function submit(cap: Capture, mode: Mode, instruction: string) {
@@ -434,21 +457,20 @@ function render() {
   trayEl.classList.toggle('is-stale', tray.stale);
 
   const original = card(0, ['original', tray.heard === 0 ? 'heard' : ''], 'original', codeHtml(tray.capture.text));
-  const options = tray.slots.map((s, i) => {
-    const slot = i + 1;
-    const classes = [s.status, slot === tray.heard ? 'heard' : ''];
-    if (s.status === 'pending') return card(slot, classes, '…', '<span class="placeholder">waiting for option</span>');
-    if (s.status === 'empty') return card(slot, classes, '—', '<span class="placeholder">no option</span>');
-    const label = s.status === 'failed' ? `${s.option!.label} (failed)` : s.option!.label;
-    return card(slot, classes, label, diffHtml(tray.capture.text, s.option!.code));
-  });
+  const options = tray.slots.map((s, i) => slotCard(i + 1, s, tray.heard, tray.capture.text));
 
   const times = timing?.requestId === tray.requestId ? timing : null; // never show the previous request's times
   const ms = (v?: number) => (v === undefined ? '…' : v < 1000 ? `${Math.round(v)} ms` : `${(v / 1000).toFixed(1)} s`);
+  const count = (pred: (s: SlotCard) => boolean) => tray.slots.filter(pred).length;
+  const checked = tray.validationMs.filter((v) => v > 0); // identical/duplicate never reach the evaluator
   const status = [
-    `provider: ${provider.name}`,
+    `provider: ${providerLabel()}`,
     `first ${ms(times?.firstMs)}`,
     `last ${tray.done ? ms(times?.lastMs) : '…'}`,
+    `${count((s) => s.status === 'ready')} ok · ${count((s) => !!s.retried)} retried · ${count((s) => s.status === 'dropped')} dropped`,
+    checked.length
+      ? `validation ${(checked.reduce((a, b) => a + b, 0) / checked.length).toFixed(1)} ms avg / ${Math.max(...checked).toFixed(1)} ms max`
+      : 'validation …',
     tray.heard === 0 ? 'audition: off (original)' : `audition: on (option ${tray.heard})`,
     swap,
   ].join(' · ');
@@ -460,8 +482,42 @@ function render() {
   statusEl.textContent = `${KEYS_HINT} · ${swap.replace('(T)', '(Alt+T)')}`;
 }
 
-function card(slot: number, classes: string[], label: string, body: string) {
-  return `<div class="card ${classes.join(' ')}" data-slot="${slot}"><b>${slot}</b> ${escapeHtml(label)}<code>${body}</code></div>`;
+function providerLabel() {
+  if (!(provider instanceof MockProvider) || provider.faultRate === 0) return provider.name;
+  return `${provider.name} (faults ${Math.round(provider.faultRate * 100)}%${provider.faultKind ? ` ${provider.faultKind}` : ''}${provider.retryFails ? ', retries fail' : ''})`;
+}
+
+const placeholder = (text: string) => `<span class="placeholder">${escapeHtml(text)}</span>`;
+
+function slotCard(slot: number, s: SlotCard, heard: Slot, original: string) {
+  const classes = [s.status, slot === heard ? 'heard' : ''];
+  const why = s.drop ? reasonLabel(s.drop.reason, s.drop.message) : '';
+  switch (s.status) {
+    case 'pending':
+      return card(slot, classes, '…', placeholder('waiting for option'));
+    case 'validating':
+      return card(slot, classes, s.retried ? 'replacement' : '…', placeholder('validating…'), { title: s.drop?.message });
+    case 'retrying':
+      return card(slot, classes, '…', placeholder(`retrying… (${why})`), { title: s.drop?.message });
+    case 'dropped':
+      return card(slot, classes, 'dropped', placeholder(`dropped: ${why}`), { title: s.drop?.message });
+    case 'empty':
+      return card(slot, classes, '—', placeholder('no option'));
+    case 'ready':
+    case 'failed': {
+      const label = s.status === 'failed' ? `${s.option!.label} (failed)` : s.option!.label;
+      const badges = (s.warnings ?? []).map((w) => (w === 'empty' ? 'empty' : `unknown sample: ${(s.unknownSounds ?? []).join(', ')}`));
+      if (s.retried) badges.push('retried');
+      const title = s.retried && s.drop ? `Replaces an option dropped for ${why}: ${s.drop.message}` : undefined;
+      return card(slot, classes, label, diffHtml(original, s.option!.code), { badges, title });
+    }
+  }
+}
+
+function card(slot: number, classes: string[], label: string, body: string, extra: { title?: string; badges?: string[] } = {}) {
+  const title = extra.title ? ` title="${escapeHtml(extra.title)}"` : '';
+  const badges = (extra.badges ?? []).map((b) => `<span class="badge${b === 'retried' ? ' info' : ''}">${escapeHtml(b)}</span>`).join('');
+  return `<div class="card ${classes.join(' ')}" data-slot="${slot}"${title}><b>${slot}</b> ${escapeHtml(label)}${badges}<code>${body}</code></div>`;
 }
 
 function diffHtml(before: string, after: string) {
@@ -487,9 +543,19 @@ render();
  * Presses random ready slots (and 0) at random gaps while tapping the scheduler's own queries, then
  * checks every onset that played against what the sequence of swaps should have produced.
  * Run from the console with the tray open and options ready: `await __shaper.measure(12)`.
+ * `{ validate: true }` validates 4 options per batch in the background, back to back, the whole time
+ * (every other batch in a buffer with setcps(1)), and checks the live session is untouched.
+ * `measure(0, { validate: true, holdMs: 20000 })` measures validation alone; the tray needn't be open.
  */
-async function measure(swaps = 12, minGapMs = 300, maxGapMs = 900) {
-  if (state.kind !== 'tray' || !scheduler.started) throw new Error('Play, then open the tray and wait for options.');
+async function measure(
+  swaps = 12,
+  { minGapMs = 300, maxGapMs = 900, validate = false, holdMs = 2500 }: { minGapMs?: number; maxGapMs?: number; validate?: boolean; holdMs?: number } = {},
+) {
+  if (!scheduler.started) throw new Error('Press Play first.');
+  if (swaps > 0 && state.kind !== 'tray') throw new Error('Open the tray and wait for options.');
+  const before = liveSnapshot();
+  const loadController = new AbortController();
+  const load = validate ? validationLoad(loadController.signal) : null;
   type Onset = { cycle: number; key: string; s: string };
   const played: Onset[] = [];
   const toOnsets = (haps: any[]): Onset[] =>
@@ -532,11 +598,14 @@ async function measure(swaps = 12, minGapMs = 300, maxGapMs = 900) {
       label = `key ${slot}`;
       await send({ type: 'audition', slot });
     }
-    await new Promise((r) => setTimeout(r, 2500)); // let the last swap land and play a while
+    await new Promise((r) => setTimeout(r, holdMs)); // let the last swap land and play a while
   } finally {
+    loadController.abort();
     Pattern.prototype.queryArc = queryArc;
     scheduler.setPattern = setPattern;
   }
+  const validation = load ? await load : null;
+  const isolation = compareSnapshots(before, liveSnapshot(), swaps === 0);
 
   // Later presses before the same boundary replace earlier ones: keep the last per boundary.
   const landed = segments.filter((s, i) => segments[i + 1]?.at !== s.at);
@@ -577,9 +646,187 @@ async function measure(swaps = 12, minGapMs = 300, maxGapMs = 900) {
     extra: extra.length,
     kicks: kicks.length,
     kickGapsSec,
+    ...(validation ? { validation } : {}),
+    isolation,
   };
   console.log('[shaper] measure', summary);
   return { table, summary, missing, extra };
+}
+
+// --- Validation harnesses ----------------------------------------------------------------------
+
+const LINES = ['s("bd*4")', 's("hh*8").gain(0.6)', 'note("c2 [~ c2] eb2 g1").s("sawtooth").lpf(800)'];
+
+/** What validation must never change. */
+function liveSnapshot() {
+  const sounds = Object.keys(soundMap.get()).sort().join('|');
+  let hash = 0;
+  for (let i = 0; i < sounds.length; i++) hash = (Math.imul(hash, 31) + sounds.charCodeAt(i)) | 0;
+  return {
+    cps: scheduler.cps,
+    anchorCycle: scheduler.num_cycles_at_cps_change,
+    anchorSeconds: scheduler.seconds_at_cps_change,
+    pattern: scheduler.pattern,
+    editor: view.state.doc.toString(),
+    soundCount: Object.keys(soundMap.get()).length,
+    soundHash: hash,
+    protoKeys: Object.getOwnPropertyNames(Pattern.prototype).length,
+    setcps: (globalThis as any).setcps,
+  };
+}
+
+function compareSnapshots(a: ReturnType<typeof liveSnapshot>, b: ReturnType<typeof liveSnapshot>, comparePattern: boolean) {
+  return {
+    cps: `${a.cps} → ${b.cps}`,
+    anchorKept: a.anchorCycle === b.anchorCycle && a.anchorSeconds === b.anchorSeconds,
+    ...(comparePattern ? { patternKept: a.pattern === b.pattern } : {}),
+    editorKept: a.editor === b.editor,
+    soundMapKept: a.soundCount === b.soundCount && a.soundHash === b.soundHash,
+    sounds: b.soundCount,
+    prototypeKept: a.protoKeys === b.protoKeys,
+    liveSetcpsKept: a.setcps === b.setcps,
+  };
+}
+
+/** Validates batches of 4 faulty-mock options against the current buffer, back to back, until aborted. */
+async function validationLoad(signal: AbortSignal) {
+  const mock = new MockProvider({ seed: 1, minDelayMs: 0, maxDelayMs: 0, faultRate: 0.5 });
+  const times: number[] = [];
+  let batches = 0;
+  let setcps1Batches = 0;
+  while (!signal.aborted) {
+    let buffer = view.state.doc.toString();
+    if (batches % 2) {
+      buffer = buffer.replace(/setcps\([^)]*\)/, 'setcps(1)');
+      if (buffer.includes('setcps(1)')) setcps1Batches++;
+    }
+    const text = LINES[batches % LINES.length];
+    batches++;
+    const from = buffer.indexOf(text);
+    if (from < 0) {
+      await new Promise((r) => setTimeout(r, 50));
+      continue;
+    }
+    const range = { from, to: from + text.length };
+    const req: OptionRequest = { mode: 'shape', buffer, selection: { ...range, text }, instruction: '', cps: scheduler.cps };
+    const accepted = [];
+    for await (const option of mock.generateOptions(req, signal)) {
+      const r = await validator.validate(buffer, range, option, accepted);
+      if (r.ms > 0) times.push(r.ms);
+      if (r.ok) accepted.push(option);
+    }
+  }
+  const sorted = [...times].sort((x, y) => x - y);
+  const round = (v: number) => +v.toFixed(2);
+  return {
+    batches,
+    setcps1Batches,
+    checks: times.length,
+    msAvg: round(times.reduce((x, y) => x + y, 0) / (times.length || 1)),
+    msP95: round(sorted[Math.floor(sorted.length * 0.95)] ?? 0),
+    msMax: round(sorted.at(-1) ?? 0),
+    timeouts: backend.respawns,
+  };
+}
+
+/** The open tray's slots (a function, so TypeScript doesn't keep `state` narrowed across awaits). */
+const traySlots = (): SlotCard[] => (state.kind === 'tray' ? state.slots : []);
+
+/** Pipeline events seen while a soak runs. */
+let soakLog: TrayEvent[] | null = null;
+
+const waitFor = async (cond: () => boolean, timeoutMs = 15000) => {
+  const start = performance.now();
+  while (!cond()) {
+    if (performance.now() - start > timeoutMs) throw new Error('soak: timed out waiting');
+    await new Promise((r) => setTimeout(r, 20));
+  }
+};
+
+/**
+ * Exit-criteria run: `await __shaper.soak({ requests: 30, faultRate: 0.5 })`. Requests options for the
+ * kick, hi-hat and bass lines in turn through the real tray, auditions every card that appears
+ * through the live repl, and reports how each injected fault was handled. Needs Play.
+ */
+async function soak({ requests = 30, faultRate = 0.5, retryFails = false, seed = 1 } = {}) {
+  if (!scheduler.started) throw new Error('Press Play first.');
+  const mock = new MockProvider({ seed, faultRate, retryFails, minDelayMs: 50, maxDelayMs: 200 });
+  const savedProvider = provider;
+  const savedMode = quantizer.mode;
+  provider = mock;
+  quantizer.mode = 'immediate'; // auditions don't need to wait for the beat here
+  soakLog = [];
+  let auditions = 0;
+  let failedCards = 0;
+  try {
+    for (let i = 0; i < requests; i++) {
+      while (state.kind === 'tray') await send({ type: 'escape' });
+      const doc = view.state.doc.toString();
+      const text = LINES[i % LINES.length];
+      const from = doc.indexOf(text);
+      if (from < 0) throw new Error(`soak: "${text}" is not in the editor`);
+      const cap: Capture = { range: { from, to: from + text.length }, text, buffer: doc };
+      liveRange = cap.range;
+      const requestId = ++requestSeq;
+      await send({ type: 'request', requestId, capture: cap, mode: 'shape', instruction: '' });
+      await waitFor(() => state.kind === 'tray' && state.requestId === requestId && state.done);
+      const ready = traySlots().flatMap((s, j) => (s.status === 'ready' ? [j + 1] : []));
+      for (const slot of ready) {
+        await send({ type: 'audition', slot: slot as Slot });
+        auditions++;
+      }
+      failedCards += traySlots().filter((s) => s.status === 'failed').length;
+    }
+    while (state.kind === 'tray') await send({ type: 'escape' });
+  } finally {
+    provider = savedProvider;
+    quantizer.mode = savedMode;
+  }
+  const log = soakLog;
+  soakLog = null;
+
+  // Follow each option through its events: what happened to it, and to its replacement.
+  const optionAt = new Map<string, string>(); // `${requestId}:${slot}` → option id currently in that slot
+  const outcome = new Map<string, string>(); // option id → outcome
+  const replacementOf = new Map<string, string>(); // failed option id → its replacement's id
+  for (const e of log) {
+    if (!('slot' in e) || !('requestId' in e)) continue;
+    const key = `${e.requestId}:${e.slot}`;
+    if (e.type === 'optionArrived') {
+      const previous = optionAt.get(key);
+      if (previous && outcome.get(previous)?.startsWith('retried')) replacementOf.set(previous, e.option.id);
+      optionAt.set(key, e.option.id);
+      continue;
+    }
+    const id = optionAt.get(key)!;
+    if (e.type === 'optionValidated') outcome.set(id, e.warnings.length ? `warned (${e.warnings.join(', ')})` : 'accepted');
+    if (e.type === 'optionRetrying') outcome.set(id, `retried after ${reasonLabel(e.reason, e.message)}`);
+    if (e.type === 'optionDropped') outcome.set(id, `dropped for good: ${reasonLabel(e.reason, e.message)}`);
+  }
+  const byKind: Record<string, Record<string, number>> = {};
+  for (const f of mock.faultLog) {
+    let result = outcome.get(f.optionId) ?? 'not reached (aborted)';
+    const replacement = replacementOf.get(f.optionId);
+    if (replacement) result += ` → replacement ${outcome.get(replacement) ?? '?'}`;
+    byKind[f.kind] ??= {};
+    byKind[f.kind][result] = (byKind[f.kind][result] ?? 0) + 1;
+  }
+  const hard = new Set(['syntax', 'unknown-function', 'runtime']);
+  const hardFaultsAccepted = mock.faultLog.filter((f) => hard.has(f.kind) && outcome.get(f.optionId)?.match(/^(accepted|warned)/)).length;
+  const summary = {
+    requests,
+    faultRate,
+    retryFails,
+    options: log.filter((e) => e.type === 'optionArrived').length,
+    faults: mock.faultLog.length,
+    kindsSeen: Object.keys(byKind).length,
+    auditions,
+    failedCards,
+    hardFaultsAccepted,
+  };
+  console.log('[shaper] soak', summary);
+  console.table(Object.entries(byKind).flatMap(([kind, results]) => Object.entries(results).map(([result, n]) => ({ kind, result, n }))));
+  return { summary, byKind };
 }
 
 // Debug handle for poking at things from the console.
@@ -592,6 +839,12 @@ Object.assign(window, {
     swapLog,
     send,
     measure,
+    soak,
+    validator,
+    backend,
+    get mock() {
+      return provider instanceof MockProvider ? provider : null;
+    },
     getState: () => state,
     audioContext: () => getAudioContext(),
     get provider() {
