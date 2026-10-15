@@ -3,7 +3,15 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   resolve: {
     // One instance of each, shared by @strudel/codemirror and our own code.
-    dedupe: ['@codemirror/state', '@codemirror/view', '@codemirror/commands', '@strudel/core'],
+    dedupe: [
+      '@codemirror/state',
+      '@codemirror/view',
+      '@codemirror/commands',
+      '@codemirror/language',
+      '@strudel/core',
+      '@strudel/webaudio',
+      'superdough',
+    ],
   },
   test: {
     environment: 'node',
