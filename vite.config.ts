@@ -14,6 +14,8 @@ export default defineConfig({
       'superdough',
     ],
   },
+  // The validation worker (src/validator.worker.ts) imports Strudel, which code-splits.
+  worker: { format: 'es' },
   test: {
     environment: 'node',
     // Under Node, @kabelsalat/web resolves to its CJS "main", which lacks SalatRepl (needed by core's
