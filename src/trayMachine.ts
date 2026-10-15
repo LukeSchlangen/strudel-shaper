@@ -1,6 +1,8 @@
+import type { RetryReason } from './feedback';
+import type { RequestStats } from './pipeline';
 import type { Mode, Option } from './provider';
 import type { Capture } from './splice';
-import type { DropReason, Warning } from './validator';
+import type { Warning } from './validator';
 
 /** 0 is the original (the editor's real text); 1–4 are the option cards. */
 export type Slot = 0 | 1 | 2 | 3 | 4;
@@ -20,10 +22,12 @@ export interface SlotCard {
   option?: Option;
   warnings?: Warning[];
   unknownSounds?: string[];
+  /** Passed only when checked on its own, because the buffer itself fails. */
+  checkedAlone?: boolean;
   /** A replacement was asked for. */
   retried?: boolean;
-  /** Why the slot was (last) dropped. */
-  drop?: { reason: DropReason; message: string };
+  /** Why the slot was (last) dropped or retried. */
+  drop?: { reason: RetryReason; message: string };
 }
 
 export interface TrayRequest {
@@ -38,6 +42,10 @@ export interface Tray extends TrayRequest {
   slots: SlotCard[]; // slots[i] is card i + 1
   done: boolean; // the provider has finished (or was aborted)
   error?: string;
+  /** The unmodified buffer's own error, from the request's baseline check. */
+  bufferError?: string;
+  /** Provider usage for this request (all calls), when the provider reports it. */
+  stats?: RequestStats;
   heard: Slot;
   stale: boolean;
   /** Time each validation took, for the status line. */
@@ -54,10 +62,20 @@ export type TrayEvent =
   | ({ type: 'request'; requestId: number } & TrayRequest)
   | { type: 'regenerate'; requestId: number }
   | { type: 'optionArrived'; requestId: number; slot: OptionSlot; option: Option }
-  | { type: 'optionValidated'; requestId: number; slot: OptionSlot; option: Option; warnings: Warning[]; unknownSounds?: string[]; ms: number }
-  | { type: 'optionRetrying'; requestId: number; slot: OptionSlot; reason: DropReason; message: string; ms: number }
-  | { type: 'optionDropped'; requestId: number; slot: OptionSlot; reason: DropReason; message: string; ms: number }
-  | { type: 'requestDone'; requestId: number; error?: string }
+  | {
+      type: 'optionValidated';
+      requestId: number;
+      slot: OptionSlot;
+      option: Option;
+      warnings: Warning[];
+      unknownSounds?: string[];
+      checkedAlone?: boolean;
+      ms: number;
+    }
+  | { type: 'optionRetrying'; requestId: number; slot: OptionSlot; reason: RetryReason; message: string; ms: number }
+  | { type: 'optionDropped'; requestId: number; slot: OptionSlot; reason: RetryReason; message: string; ms: number }
+  | { type: 'bufferChecked'; requestId: number; error?: string }
+  | { type: 'requestDone'; requestId: number; error?: string; stats?: RequestStats }
   | { type: 'audition'; slot: Slot }
   | { type: 'escape' }
   | { type: 'enter' }
@@ -150,7 +168,9 @@ function trayTransition(state: Tray, event: TrayEvent): Transition {
             option: event.option,
             warnings: event.warnings,
             unknownSounds: event.unknownSounds,
+            checkedAlone: event.checkedAlone,
             retried: card.retried,
+            drop: card.drop,
           };
           break;
         case 'optionRetrying':
@@ -163,10 +183,14 @@ function trayTransition(state: Tray, event: TrayEvent): Transition {
       return withSlots(slots, timed);
     }
 
+    case 'bufferChecked':
+      if (event.requestId !== state.requestId) return stay(state);
+      return stay({ ...state, bufferError: event.error });
+
     case 'requestDone': {
       if (event.requestId !== state.requestId) return stay(state);
       const slots = state.slots.map((s): SlotCard => (s.status === 'pending' ? { status: 'empty' } : s));
-      return withSlots(slots, { done: true, error: event.error });
+      return withSlots(slots, { done: true, error: event.error, stats: event.stats });
     }
 
     case 'audition': {

@@ -69,7 +69,8 @@ function setup(provider: Provider, backend = new FakeBackend(), deps: Partial<Pi
   const controller = new AbortController();
   const full: PipelineDeps = { provider, validator, getBuffer: () => BUFFER, getRange: () => RANGE, emit: (e) => events.push(e), ...deps };
   const run = () => runRequest(full, 7, req, 4, controller.signal);
-  const summary = () => events.map((e) => ('slot' in e ? `${e.type} ${e.slot}${'option' in e ? ` ${e.option.code}` : ''}${'reason' in e ? ` ${e.reason}` : ''}` : e.type));
+  // bufferChecked (the baseline) comes first in every request; it has its own tests below.
+  const summary = () => events.filter((e) => e.type !== 'bufferChecked').map((e) => ('slot' in e ? `${e.type} ${e.slot}${'option' in e ? ` ${e.option.code}` : ''}${'reason' in e ? ` ${e.reason}` : ''}` : e.type));
   return { events, run, controller, backend, summary };
 }
 
@@ -85,7 +86,8 @@ describe('runRequest', () => {
       'requestDone',
     ]);
     expect(t.events.every((e) => !('requestId' in e) || e.requestId === 7)).toBe(true);
-    expect(t.backend.seen).toEqual([splice(BUFFER, RANGE, 'abc.a()'), splice(BUFFER, RANGE, 'abc.b()')]);
+    // The unmodified buffer is checked once, first.
+    expect(t.backend.seen).toEqual([BUFFER, splice(BUFFER, RANGE, 'abc.a()'), splice(BUFFER, RANGE, 'abc.b()')]);
   });
 
   it('retries a failed option once with feedback; the replacement fills the same slot', async () => {
@@ -104,7 +106,10 @@ describe('runRequest', () => {
       'requestDone',
     ]);
     const retry = provider.requests[1];
-    expect(retry.feedback).toEqual({ previousCode: 'abc.BAD(', error: 'syntax: Unexpected token' });
+    expect(retry.feedback).toEqual({
+      previousCode: 'abc.BAD(',
+      error: 'This code has a syntax error (Unexpected token). Return valid Strudel code: check brackets, quotes and mini-notation.',
+    });
     expect(retry.selection).toEqual({ ...RANGE, text: SEL });
   });
 
@@ -183,7 +188,7 @@ describe('runRequest', () => {
     t.controller.abort();
     gate.resolve();
     await done;
-    expect(backend.seen).toHaveLength(1);
+    expect(backend.seen).toHaveLength(1); // the baseline; neither option was checked
     expect(t.summary()).toEqual(['optionArrived 1 abc.a()', 'optionArrived 2 abc.b()']);
   });
 
@@ -201,7 +206,7 @@ describe('runRequest', () => {
     range = { from: RANGE.from + 2, to: RANGE.to + 2 };
     gate.resolve();
     await done;
-    expect(backend.seen[1]).toBe(splice(buffer, range, 'abc.b()'));
+    expect(backend.seen[2]).toBe(splice(buffer, range, 'abc.b()'));
   });
 
   it('ignores options beyond the slot count', async () => {
@@ -233,7 +238,8 @@ describe('runRequest with the faulty mock and the real sandbox', () => {
         getRange: () => range,
         emit: (e) => {
           if (e.type === 'optionValidated') ready.push({ code: e.option.code, range });
-          if (e.type === 'optionValidated' || e.type === 'optionDropped' || e.type === 'optionRetrying') outcomes.push(e.type);
+          if (e.type === 'optionValidated' || e.type === 'optionDropped') outcomes.push(e.type);
+          if (e.type === 'optionRetrying') outcomes.push(['empty', 'unknown-sample'].includes(e.reason) ? 'optionRetrying (silent)' : e.type);
         },
       };
       await runRequest(deps, i, r, 4, new AbortController().signal);
@@ -254,8 +260,9 @@ describe('runRequest with the faulty mock and the real sandbox', () => {
     expect(outcomes).not.toContain('optionDropped');
   });
 
-  it('with retryFails, failed slots are dropped for good', async () => {
+  it('with retryFails, failed slots are dropped for good; silent ones keep their original', async () => {
     const { outcomes } = await soak(true);
     expect(outcomes.filter((o) => o === 'optionDropped').length).toBe(outcomes.filter((o) => o === 'optionRetrying').length);
+    expect(outcomes).toContain('optionRetrying (silent)');
   });
 });

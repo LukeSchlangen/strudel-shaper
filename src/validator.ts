@@ -1,12 +1,16 @@
 import type { Option } from './provider';
-import type { CheckResult, Span, StubNames } from './sandbox';
+import type { CheckResult, CheckStage, Span, StubNames } from './sandbox';
 import { splice, type Range } from './splice';
 
 /** One option's eval + query must finish within this, or it's dropped. */
 export const VALIDATION_TIMEOUT_MS = 250;
 
-export type DropReason = 'syntax' | 'eval' | 'query' | 'identical' | 'duplicate' | 'timeout';
+/** `buffer`: the option fails only because the unmodified buffer fails the same way, and it fails alone too. */
+export type DropReason = 'syntax' | 'eval' | 'query' | 'identical' | 'duplicate' | 'timeout' | 'buffer';
 export type Warning = 'unknown-sample' | 'empty';
+
+/** The unmodified buffer's own check, once per request. */
+export type Baseline = { ok: true } | { ok: false; stage: CheckStage; message: string };
 
 export interface ValidationResult {
   ok: boolean; // false = drop
@@ -17,6 +21,8 @@ export interface ValidationResult {
   /** Onsets in 2 cycles: the option's own when they can be told apart (eventScope), else the whole buffer's. */
   eventCount: number;
   eventScope?: 'option' | 'buffer';
+  /** The spliced buffer failed with the buffer's own error, so the option was checked on its own. */
+  checkedAlone?: boolean;
   ms: number;
 }
 
@@ -35,8 +41,19 @@ export interface ValidatorDeps {
 export class Validator {
   constructor(private readonly deps: ValidatorDeps) {}
 
-  /** Checks `option` spliced into `buffer` at `range`. `others` are the options already accepted for this request. */
-  async validate(buffer: string, range: Range, option: Option, others: Option[]): Promise<ValidationResult> {
+  /** Checks the unmodified buffer, so options aren't blamed for an error that is already there. */
+  async baseline(buffer: string): Promise<Baseline> {
+    const r = await this.deps.backend.check(buffer, this.deps.cps());
+    return r.ok ? { ok: true } : { ok: false, stage: r.stage, message: r.message };
+  }
+
+  /**
+   * Checks `option` spliced into `buffer` at `range`. `others` are the options already accepted for
+   * this request. With a failing `baseline`, an option that fails the same way is checked on its own
+   * (the buffer's tempo lines + the option): kept if that passes, dropped as `buffer` if it fails the
+   * same way again.
+   */
+  async validate(buffer: string, range: Range, option: Option, others: Option[], baseline?: Baseline): Promise<ValidationResult> {
     const drop = (reason: DropReason, message: string, ms = 0): ValidationResult => ({
       ok: false,
       reason,
@@ -53,7 +70,16 @@ export class Validator {
     if (twin) return drop('duplicate', `The option is the same as the earlier option "${twin.label}".`);
 
     const span = { from: range.from, to: range.from + option.code.length };
-    const result = await this.deps.backend.check(splice(buffer, range, option.code), this.deps.cps(), span);
+    let result = await this.deps.backend.check(splice(buffer, range, option.code), this.deps.cps(), span);
+    let checkedAlone = false;
+    if (!result.ok && baseline && !baseline.ok && sameError(result, baseline)) {
+      const tempo = tempoLines(buffer);
+      const alone = tempo + option.code;
+      const spliced = result;
+      result = await this.deps.backend.check(alone, this.deps.cps(), { from: tempo.length, to: alone.length });
+      if (!result.ok && sameError(result, baseline)) return drop('buffer', baseline.message, spliced.ms + result.ms);
+      checkedAlone = true;
+    }
     if (!result.ok) return drop(result.stage, result.message, result.ms);
     // A backend that can't pre-empt (in-process) still reports how long it took.
     if (result.ms > VALIDATION_TIMEOUT_MS) {
@@ -72,9 +98,25 @@ export class Validator {
       ...(unknownSounds.length ? { unknownSounds } : {}),
       eventCount: own.eventCount,
       eventScope: result.span ? 'option' : 'buffer',
+      ...(checkedAlone ? { checkedAlone } : {}),
       ms: result.ms,
     };
   }
+}
+
+/** Same stage and same message, ignoring positions (an option with more lines moves the error). */
+export function sameError(a: { stage: CheckStage; message: string }, b: { stage: CheckStage; message: string }): boolean {
+  const strip = (m: string) => m.replace(/\(\d+:\d+\)/g, '').replace(/\b(line|col(umn)?)\s*\d+/gi, '').trim();
+  return a.stage === b.stage && strip(a.message) === strip(b.message);
+}
+
+/** The buffer's top-level tempo calls, each on its own line, so an option checked alone runs at the buffer's tempo. */
+export function tempoLines(buffer: string): string {
+  return buffer
+    .split('\n')
+    .filter((l) => /^\s*set(cps|cpm|Cps|Cpm)\s*\([^)]*\)\s*;?\s*(\/\/.*)?$/.test(l))
+    .map((l) => l.trim() + '\n')
+    .join('');
 }
 
 const WORD = /[A-Za-z0-9_$]/;
