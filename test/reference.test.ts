@@ -1,0 +1,94 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { CATEGORIES, buildReference, parseDocs } from '../scripts/build-reference';
+import { Sandbox } from '../src/sandbox';
+import { COMMON_DRUMS, summariseSounds } from '../src/soundSummary';
+import { soundKey } from '../src/sandbox';
+
+const read = (p: string) => readFileSync(fileURLToPath(new URL(`../${p}`, import.meta.url)), 'utf8');
+const scope = JSON.parse(read('src/generated/scope.json')) as { globals: string[]; methods: string[] };
+const sounds = JSON.parse(read('src/generated/sounds.json')) as string[];
+
+describe('build-reference', () => {
+  it('the checked-in reference is up to date (run npm run build:reference)', () => {
+    expect(read('src/generated/strudel-reference.md')).toBe(buildReference().text);
+  });
+
+  it('only lists names the live scope has', () => {
+    const live = new Set([...scope.globals, ...scope.methods, 'setcps', 'setcpm']);
+    const { missing } = buildReference();
+    expect(missing).toEqual([]);
+    for (const [, names] of CATEGORIES) for (const n of names) expect(live.has(n), n).toBe(true);
+  });
+
+  it('stays within the prompt budget', () => {
+    const { text } = buildReference();
+    expect(text.length / 4).toBeLessThan(4500);
+    expect(text.length / 4).toBeGreaterThan(2000);
+  });
+
+  it('parses JSDoc by @name, by the declaration below it, and with synonyms', () => {
+    const docs = parseDocs(`
+/** Speeds it up.
+ * @name fast
+ * @synonyms density
+ * @param {number | Pattern} factor speed up factor
+ * @example
+ * s("bd").fast(2)
+ */
+export const { fast, density } = register('fast', f);
+/** The ply function repeats each event.
+ * @example
+ * s("bd").ply(2)
+ */
+export const ply = register('ply', f);`);
+    expect(docs.get('fast')).toMatchObject({ params: ['factor'], synonyms: ['density'], summary: 'Speeds it up', example: 's("bd").fast(2)' });
+    expect(docs.get('ply')).toMatchObject({ summary: 'The ply function repeats each event', example: 's("bd").ply(2)' });
+  });
+
+  describe('hand-written examples', () => {
+    let sandbox: Sandbox;
+    beforeAll(async () => {
+      sandbox = await Sandbox.create();
+    });
+    const extras = read('scripts/reference-extras.md');
+    const examples = /```js\n([\s\S]*?)```/.exec(extras)![1].trim().split('\n');
+    it.each(examples)('%s evaluates, sounds, and uses loaded sounds', async (code) => {
+      const r = await sandbox.check(code, 0.5);
+      expect(r.ok, r.ok ? '' : r.message).toBe(true);
+      if (!r.ok) return;
+      expect(r.eventCount).toBeGreaterThan(0);
+      const loaded = new Set(sounds);
+      expect(r.sounds.filter((s) => !loaded.has(s))).toEqual([]);
+    });
+  });
+});
+
+describe('summariseSounds', () => {
+  const summary = summariseSounds(sounds);
+
+  it('names every common drum and stays compact', () => {
+    const first = summary.split('\n')[0];
+    for (const d of COMMON_DRUMS.filter((d) => sounds.includes(d))) expect(first).toContain(` ${d}`);
+    expect(summary.length / 4).toBeLessThan(2200);
+  });
+
+  it('folds bank aliases into one line', () => {
+    expect(summary).toMatch(/^ {2}rolandtr909: /m);
+    expect(summary).not.toMatch(/^ {2}tr909: /m);
+  });
+
+  it('keeps every loaded sound key reachable from the summary', () => {
+    // Each sound is either named plainly, or appears as `bank: … sound …`, or as a gm_ instrument.
+    const text = summary.toLowerCase();
+    const missing = sounds.filter((s) => {
+      const key = soundKey({ s })!;
+      const [bank, ...rest] = key.split('_');
+      if (bank === 'gm') return !text.includes(` ${rest.join('_')}`);
+      if (rest.length && new RegExp(`(^|[\\sa-z0-9])${bank}: .*\\b${rest.join('_')}\\b`, 'm').test(text)) return false;
+      return !new RegExp(`(^|[\\s:])${key}(\\s|$)`, 'm').test(text);
+    });
+    expect(missing).toEqual([]);
+  });
+});

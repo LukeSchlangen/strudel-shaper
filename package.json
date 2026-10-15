@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
-    "build:reference": "node eval/runner.mjs scripts/build-reference.ts",
+    "build:reference": "tsx scripts/build-reference.ts",
     "eval": "node eval/runner.mjs eval/run.ts",
     "check:key": "node scripts/check-key.mjs"
   },

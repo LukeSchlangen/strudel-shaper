@@ -69,16 +69,19 @@ const validator = new Validator({
 // (webaudio, draw, codemirror, hydra, soundfonts, midi) become stubs there. Checks wait for this.
 Promise.resolve(mirror.prebaked)
   .catch((err: unknown) => console.error('[shaper] prebake failed', err))
-  .then(() => {
-    const methods = Object.getOwnPropertyNames(Pattern.prototype).filter(
-      (name) => typeof Object.getOwnPropertyDescriptor(Pattern.prototype, name)?.value === 'function',
-    );
-    // Only names live code can actually call: user code resolves against globalThis, and some scope
-    // entries never reach it (density, plywith, plyforeach are exported twice inside core, so
-    // `export *` drops them). Stubbing those would let the worker accept code the live repl rejects.
-    const globals = Object.keys(strudelScope).filter((name) => (globalThis as any)[name] !== undefined);
-    backend.init({ globals, methods });
-  });
+  .then(() => backend.init(liveScope()));
+
+/** The names live code can call: the worker stubs the ones it can't load, and the model reference is filtered by them. */
+function liveScope() {
+  const methods = Object.getOwnPropertyNames(Pattern.prototype).filter(
+    (name) => typeof Object.getOwnPropertyDescriptor(Pattern.prototype, name)?.value === 'function',
+  );
+  // Only names live code can actually call: user code resolves against globalThis, and some scope
+  // entries never reach it (density, plywith, plyforeach are exported twice inside core, so
+  // `export *` drops them). Stubbing those would let the worker accept code the live repl rejects.
+  const globals = Object.keys(strudelScope).filter((name) => (globalThis as any)[name] !== undefined);
+  return { globals, methods };
+}
 
 // --- Audio on the first keypress ---------------------------------------------------------------
 
@@ -846,6 +849,13 @@ Object.assign(window, {
       return provider instanceof MockProvider ? provider : null;
     },
     getState: () => state,
+    /** Dev: the live scope and sound names, for src/generated/scope.json and sounds.json (npm run build:reference). */
+    dumpScope: () => ({ ...liveScope(), sounds: Object.keys(soundMap.get()).sort() }),
+    saveScope: async () => {
+      await mirror.prebaked;
+      const res = await fetch('/__shaper/scope', { method: 'POST', body: JSON.stringify({ ...liveScope(), sounds: Object.keys(soundMap.get()).sort() }) });
+      return res.json();
+    },
     audioContext: () => getAudioContext(),
     get provider() {
       return provider;
