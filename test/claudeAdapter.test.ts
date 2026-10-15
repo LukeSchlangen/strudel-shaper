@@ -112,6 +112,15 @@ describe('streamClaudeOptions', () => {
     expect((lines.at(-1) as any).usage.cacheRead).toBe(4 * 3000);
   });
 
+  it('aborts a stalled upstream stream after the idle timeout, keeping options already sent', async () => {
+    const stalled = new Promise<void>(() => {});
+    const client = new FakeMessages([textEvents(payload(4), { chunk: 4 })], { after: 30, until: stalled });
+    const lines = await collect(streamClaudeOptions(deps(client, { idleTimeoutMs: 30 }), req, new AbortController().signal));
+    expect(lines.at(-1)).toMatchObject({ type: 'error', kind: 'timeout' });
+    expect(client.calls[0].signal?.aborted).toBe(true);
+    expect(client.aborted).toBe(1);
+  });
+
   it('refuses calls past the local rate limit', async () => {
     const limiter = new RateLimiter(1);
     const d = deps(new FakeMessages([textEvents(payload(1))]), { beforeCall: () => limiter.take() });

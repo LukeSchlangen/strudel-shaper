@@ -37,6 +37,7 @@ export type ErrorKind =
   | 'truncated'
   | 'bad-request'
   | 'network'
+  | 'timeout'
   | 'internal';
 
 export type RemoteLine =

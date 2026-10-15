@@ -24,6 +24,8 @@ export interface ClaudeDeps {
   beforeCall?: () => boolean;
   /** Only for measuring a cold grammar compile: a schema whose structure differs from the usual one. */
   schemaKey?: string;
+  /** Abort a call when no stream event arrives for this long (default 20 s). The SDK's own timeout is 10 min. */
+  idleTimeoutMs?: number;
   now?: () => number;
 }
 
@@ -98,9 +100,25 @@ async function* oneCall(
     return;
   }
 
+  // The call has its own controller: the browser's abort and the idle timeout both cancel it.
+  const call = new AbortController();
+  const onAbort = () => call.abort();
+  signal.addEventListener('abort', onAbort, { once: true });
+  const idleMs = deps.idleTimeoutMs ?? 20_000;
+  let idle = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const touch = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      idle = true;
+      call.abort();
+    }, idleMs);
+  };
+  touch();
   try {
-    const stream = await deps.client.messages.create(buildParams(deps, req, opts), { signal });
+    const stream = await deps.client.messages.create(buildParams(deps, req, opts), { signal: call.signal });
     for await (const event of stream) {
+      touch();
       if (signal.aborted) return;
       if (event.type === 'message_start') {
         const u = event.message.usage;
@@ -129,10 +147,18 @@ async function* oneCall(
     }
   } catch (err) {
     if (signal.aborted) return;
+    if (idle) {
+      console.warn(`[proxy] upstream idle for ${idleMs} ms; aborted`);
+      yield { type: 'error', kind: 'timeout', message: `The model stopped responding for ${Math.round(idleMs / 1000)} s.` };
+      return;
+    }
     const mapped = mapError(err);
     if (mapped.kind === 'internal') console.error('[proxy] upstream failed', err);
     yield { type: 'error', ...mapped };
     return;
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener('abort', onAbort);
   }
   if (signal.aborted) return;
 
