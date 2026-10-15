@@ -52,6 +52,14 @@ stack(
     expect(live.scheduler.cps).toBe(0.7);
   });
 
+  it('slider stubs return their value, so a slider-driven option still sounds', async () => {
+    const sandbox = await Sandbox.create();
+    sandbox.installStubs({ globals: ['sliderWithID', 'slider'], methods: [] });
+    // The transpiler rewrites slider(…) to sliderWithID(id, …).
+    expect(await sandbox.check('s("hh*4").gain(slider(0.5, 0, 1))', 0.5)).toMatchObject({ ok: true, eventCount: 8 });
+    expect(sandbox.stubCalls).toEqual(['sliderWithID']);
+  });
+
   it('a later check does not see globals assigned by an earlier one', async () => {
     const sandbox = await Sandbox.create();
     expect(await sandbox.check('globalThis.leak = s("hh")\nleak', 0.5)).toMatchObject({ ok: true });

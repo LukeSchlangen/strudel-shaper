@@ -234,8 +234,8 @@ describe('faulty mode', () => {
       'unknown-function': { ok: false, reason: 'eval' },
       'unknown-sample': { ok: true, warnings: ['unknown-sample'], unknownSounds: ['zzzz'] },
       runtime: { ok: false, reason: 'query' },
-      // The other lines keep the stack sounding; the empty warning itself is covered in validator.test.ts.
-      empty: { ok: true, warnings: [] },
+      // A warning even though the other lines of the stack keep sounding.
+      empty: { ok: true, warnings: ['empty'], eventCount: 0 },
       identical: { ok: false, reason: 'identical' },
       duplicate: { ok: false, reason: 'duplicate' },
     };

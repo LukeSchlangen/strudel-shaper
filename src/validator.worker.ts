@@ -13,9 +13,8 @@ const sandbox = Sandbox.create();
 self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
   const box = await sandbox;
   if (data.type === 'init') {
-    box.installStubs(data.stubs);
-    post({ type: 'ready' });
+    post({ type: 'ready', stubbed: box.installStubs(data.stubs) });
     return;
   }
-  post({ type: 'result', id: data.id, result: await box.check(data.code, data.cps) });
+  post({ type: 'result', id: data.id, result: await box.check(data.code, data.cps, data.span) });
 };

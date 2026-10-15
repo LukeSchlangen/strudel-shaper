@@ -18,12 +18,16 @@ beforeAll(async () => {
 });
 
 describe('Validator stages', () => {
-  it('accepts a valid option and counts 2 cycles of onsets', async () => {
+  it('accepts a valid option and counts its own onsets over 2 cycles', async () => {
     const r = await validate('s("hh*8").fast(2)');
-    expect(r).toMatchObject({ ok: true, warnings: [] });
-    // 4 kicks + 16 hats + 4 bass notes per cycle, ×2 cycles
-    expect(r.eventCount).toBe(2 * (4 + 16 + 4));
+    expect(r).toMatchObject({ ok: true, warnings: [], eventCount: 2 * 16, eventScope: 'option' });
     expect(r.ms).toBeGreaterThanOrEqual(0);
+  });
+
+  it('falls back to counting the whole buffer when the option has no mini-notation', async () => {
+    const r = await validate("sound(seq('hh', 'hh')).fast(4)");
+    // 4 kicks + 8 hats + 4 bass notes per cycle, ×2 cycles
+    expect(r).toMatchObject({ ok: true, eventScope: 'buffer', eventCount: 2 * (4 + 8 + 4) });
   });
 
   it('identical: same as the selection after normalizing whitespace', async () => {
@@ -76,10 +80,22 @@ describe('Validator stages', () => {
     expect(r.message).toMatch(/toFixed/);
   });
 
-  it('empty: 0 onsets is a warning, not a drop', async () => {
+  it('empty: an option with 0 onsets of its own is a warning, not a drop, even inside a sounding stack', async () => {
+    const r = await validate('s("hh*8").degradeBy(1)');
+    expect(r).toMatchObject({ ok: true, warnings: ['empty'], eventCount: 0, eventScope: 'option' });
+  });
+
+  it('empty: the whole buffer silent, when the option cannot be told apart', async () => {
     const whole = { from: 0, to: STARTER_CODE.length };
-    const r = await validator.validate(STARTER_CODE, whole, opt('s("hh*8").degradeBy(1)'), []);
-    expect(r).toMatchObject({ ok: true, warnings: ['empty'], eventCount: 0 });
+    const r = await validator.validate(STARTER_CODE, whole, opt('silence.fast(2)'), []);
+    expect(r).toMatchObject({ ok: true, warnings: ['empty'], eventCount: 0, eventScope: 'buffer' });
+  });
+
+  it('unknown-sample: only the option\'s own sounds count', async () => {
+    const buffer = STARTER_CODE.replace('s("bd*4")', 's("nope*4")');
+    const from = buffer.indexOf(HH);
+    const r = await validator.validate(buffer, { from, to: from + HH.length }, opt('s("hh*4")'), []);
+    expect(r).toMatchObject({ ok: true, warnings: [] });
   });
 
   it('unknown-sample: names the sounds missing from the supplied list', async () => {

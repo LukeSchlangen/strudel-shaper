@@ -12,9 +12,25 @@ import { transpiler } from '@strudel/transpiler';
 
 export type CheckStage = 'syntax' | 'eval' | 'query' | 'timeout';
 
+export interface EventSummary {
+  eventCount: number; // onsets in cycles 0–2
+  sounds: string[]; // distinct sound keys of those onsets
+}
+
 export type CheckResult =
   | { ok: false; stage: CheckStage; message: string; ms: number }
-  | { ok: true; eventCount: number; sounds: string[]; ms: number };
+  | ({
+      ok: true;
+      ms: number;
+      /** Only the onsets that come from mini-notation inside `span`, when `span` contains any. */
+      span?: EventSummary;
+    } & EventSummary);
+
+/** A [from, to) character range of the evaluated code: the option, spliced in. */
+export interface Span {
+  from: number;
+  to: number;
+}
 
 /** Names from the live scope that the sandbox can't load (they need the DOM, AudioContext or network). */
 export interface StubNames {
@@ -81,23 +97,35 @@ export class Sandbox {
     return sandbox;
   }
 
-  /** Stub names that exist in the live scope but not here. Globals return silence; methods return `this`. */
-  installStubs({ globals, methods }: StubNames) {
+  /**
+   * Stub names that exist in the live scope but not here. Globals return silence; methods return `this`.
+   * Returns the names actually stubbed.
+   */
+  installStubs({ globals, methods }: StubNames): StubNames {
     const calls = this.stubCalls;
     const g = globalThis as any;
+    const stubbed: StubNames = { globals: [], methods: [] };
+    const proto = core.Pattern.prototype;
     for (const name of globals) {
       if (name in g) continue;
-      g[name] = (..._args: unknown[]) => (calls.push(name), core.silence);
+      if (name === 'slider' || name === 'sliderWithID') {
+        // slider(value, min, max); the transpiler rewrites it to sliderWithID(id, value, min, max).
+        g[name] = (...args: unknown[]) => (calls.push(name), core.pure(args[name === 'slider' ? 0 : 1]));
+      } else {
+        g[name] = (..._args: unknown[]) => (calls.push(name), core.silence);
+      }
+      stubbed.globals.push(name);
     }
-    const proto = core.Pattern.prototype;
     for (const name of methods) {
       if (name in proto) continue;
       proto[name] = function (this: unknown) {
         calls.push(`.${name}`);
         return this;
       };
+      stubbed.methods.push(name);
     }
     this.takeSnapshot();
+    return stubbed;
   }
 
   private takeSnapshot() {
@@ -105,16 +133,21 @@ export class Sandbox {
     this.protoSnap = snapshot(core.Pattern.prototype);
   }
 
-  /** Transpile, evaluate and query 2 cycles of `code`. Never throws. */
-  async check(code: string, cps: number): Promise<CheckResult> {
+  /**
+   * Transpile, evaluate and query 2 cycles of `code`. Never throws. With `span`, also summarises the
+   * onsets that come from that part of the code (haps carry the source locations of their mini-notation).
+   */
+  async check(code: string, cps: number, span?: Span): Promise<CheckResult> {
     const start = now();
     const fail = (stage: CheckStage, message: string): CheckResult => ({ ok: false, stage, message, ms: now() - start });
     try {
+      let miniLocations: Array<[number, number]>;
       try {
-        transpiler(code, {});
+        miniLocations = transpiler(code, {}).miniLocations ?? [];
       } catch (err) {
         return fail('syntax', errorText(err));
       }
+      const inSpan = (start: number) => !!span && start >= span.from && start < span.to;
       this.repl.setCps(cps); // so .cpm() sees the live tempo
       this.repl.state.evalError = undefined;
       // Swallows errors like the live repl: undefined on failure.
@@ -130,17 +163,24 @@ export class Sandbox {
         return fail('query', errorText(err));
       }
       const onsets = haps.filter((h) => h.hasOnset());
-      const sounds = new Set<string>();
-      for (const h of onsets) {
-        const key = soundKey(h.value);
-        if (key) sounds.add(key);
-      }
-      return { ok: true, eventCount: onsets.length, sounds: [...sounds], ms: now() - start };
+      const all = summarise(onsets);
+      if (!miniLocations.some(([s]) => inSpan(s))) return { ok: true, ...all, ms: now() - start };
+      const own = onsets.filter((h) => (h.context?.locations ?? []).some((l: { start: number }) => inSpan(l.start)));
+      return { ok: true, ...all, span: summarise(own), ms: now() - start };
     } finally {
       restore(globalThis, this.globalSnap);
       restore(core.Pattern.prototype, this.protoSnap);
     }
   }
+}
+
+function summarise(onsets: any[]): EventSummary {
+  const sounds = new Set<string>();
+  for (const h of onsets) {
+    const key = soundKey(h.value);
+    if (key) sounds.add(key);
+  }
+  return { eventCount: onsets.length, sounds: [...sounds] };
 }
 
 function errorText(err: unknown): string {
