@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   resolve: {
@@ -7,5 +7,9 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    server: {
+      // @kabelsalat/web's "main" entry doesn't load under plain Node ESM; let Vite resolve its "module" entry.
+      deps: { inline: [/@strudel\//, /@kabelsalat\//] },
+    },
   },
 });
