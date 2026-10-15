@@ -1,4 +1,4 @@
-/** The interface real models plug into (milestone 4). The model returns code and short labels only. */
+/** The interface real models plug into. The model returns code and short labels only. */
 export type Mode = 'shape' | 'fix-minimal' | 'fix-rewrite';
 
 export interface OptionRequest {
@@ -19,7 +19,31 @@ export interface Option {
   code: string;
 }
 
+/** What a provider can report about one call, for the status line and the eval. All optional. */
+export interface ProviderStats {
+  firstMs?: number; // first option, as measured by the provider (server side for remote ones)
+  lastMs?: number;
+  totalMs?: number;
+  tokens?: { input: number; output: number; cacheRead: number; cacheWrite: number };
+  costUsd?: number;
+}
+
+export interface ProviderHooks {
+  onStats?(stats: ProviderStats): void;
+}
+
+/** A provider failure with a short message fit for the status line. `kind` is the provider's own category. */
+export class ProviderError extends Error {
+  constructor(
+    readonly kind: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ProviderError';
+  }
+}
+
 export interface Provider {
   name: string;
-  generateOptions(req: OptionRequest, signal: AbortSignal): AsyncIterable<Option>;
+  generateOptions(req: OptionRequest, signal: AbortSignal, hooks?: ProviderHooks): AsyncIterable<Option>;
 }

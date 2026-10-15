@@ -12,6 +12,8 @@ import { FAULT_KINDS, MockProvider, type FaultKind } from './mockProvider';
 import { STARTER_CODE } from './options';
 import { reasonLabel, runRequest } from './pipeline';
 import type { Mode, OptionRequest, Provider } from './provider';
+import { RemoteProvider, type RemoteSettings } from './remoteProvider';
+import { COMMON_DRUMS, summariseSounds } from './soundSummary';
 import { Quantizer } from './quantize';
 import { isRangeIntact, mapRange, splice, type Capture, type Edit, type Range } from './splice';
 import { initialState, slotCount, transition, type Effect, type Slot, type SlotCard, type TrayEvent, type TrayState } from './trayMachine';
@@ -35,7 +37,108 @@ const trayEl = document.getElementById('tray')!;
 document.getElementById('play')!.addEventListener('click', () => mirror.evaluate());
 document.getElementById('stop')!.addEventListener('click', () => mirror.stop());
 
-let provider: Provider = new MockProvider({ seed: Date.now() >>> 0, ...devMockOptions() });
+// --- Providers --------------------------------------------------------------------------------
+
+/** The mock stays available offline, and keeps handling the fix modes (⌘J / ⌘⇧J) for now. */
+const mockProvider = new MockProvider({ seed: Date.now() >>> 0, ...devMockOptions() });
+
+/** What the header select and Alt+P cycle through. `?provider=mock|claude&model=…` picks the first one. */
+const CHOICES = [
+  { id: 'mock', label: 'mock' },
+  { id: 'claude:claude-haiku-5-5', label: 'claude · haiku 5.5' },
+  { id: 'claude:claude-sonnet-5-5', label: 'claude · sonnet 5.5' },
+];
+
+const query = new URLSearchParams(location.search);
+/** `?effort=low|medium|high&thinking=off|adaptive&strategy=single|parallel`: leave unset for the server's defaults. */
+const remoteSettings = (): RemoteSettings => ({
+  ...(query.get('effort') ? { effort: query.get('effort') as RemoteSettings['effort'] } : {}),
+  ...(query.get('thinking') ? { thinking: query.get('thinking') as RemoteSettings['thinking'] } : {}),
+  ...(query.get('strategy') ? { strategy: query.get('strategy') as RemoteSettings['strategy'] } : {}),
+});
+/** The loaded sounds, summarised once prebake has filled the soundMap. */
+let soundSummary: string | undefined;
+
+function makeProvider(id: string): Provider {
+  if (id === 'mock') return mockProvider;
+  const [name, model] = id.split(':');
+  return new RemoteProvider({ provider: name, model, sounds: () => soundSummary, settings: remoteSettings });
+}
+
+function initialChoice(): string {
+  const p = query.get('provider');
+  if (p === 'claude') return `claude:${query.get('model') ?? 'claude-haiku-5-5'}`;
+  return 'mock';
+}
+
+let providerId = initialChoice();
+if (!CHOICES.some((c) => c.id === providerId)) {
+  console.warn(`[shaper] unknown provider/model "${providerId}"`);
+  CHOICES.push({ id: providerId, label: providerId.replace(':', ' · ') });
+}
+let provider: Provider = makeProvider(providerId);
+
+const providerSelect = document.getElementById('provider') as HTMLSelectElement;
+providerSelect.innerHTML = CHOICES.map((c) => `<option value="${c.id}">${c.label}</option>`).join('');
+providerSelect.value = providerId;
+providerSelect.addEventListener('change', () => {
+  switchProvider(providerSelect.value);
+  view.focus();
+});
+
+/** Applies to the next request (R regenerates with it). No automatic fallback: switching is the user's call. */
+function switchProvider(id: string) {
+  providerId = id;
+  provider = makeProvider(id);
+  providerSelect.value = id;
+  const url = new URL(location.href);
+  if (id === 'mock') {
+    url.searchParams.delete('provider');
+    url.searchParams.delete('model');
+  } else {
+    const [name, model] = id.split(':');
+    url.searchParams.set('provider', name);
+    url.searchParams.set('model', model);
+  }
+  window.history.replaceState(null, '', url);
+  warmedUp = false;
+  if (gestured) void warmUp();
+  render();
+}
+
+function cycleProvider() {
+  const i = CHOICES.findIndex((c) => c.id === providerId);
+  switchProvider(CHOICES[(i + 1) % CHOICES.length].id);
+}
+
+// Warm-up (`?warmup=0` turns it off): after the first user gesture, one cheap request with the real
+// system prompt and schema, so the grammar compile and the prompt-cache write don't land on the
+// first real request. See NOTES.md (milestone 4) for whether it matters.
+const warmupEnabled = query.get('warmup') !== '0';
+let warmedUp = false;
+let gestured = false;
+async function warmUp() {
+  if (!warmupEnabled || warmedUp || !(provider instanceof RemoteProvider)) return;
+  warmedUp = true;
+  const model = provider.model;
+  await Promise.resolve(mirror.prebaked).catch(() => {});
+  const res = await fetch('/api/warmup', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ model, sounds: soundSummary, ...remoteSettings() }),
+  })
+    .then((r) => r.json())
+    .catch((err) => ({ ok: false, message: String(err) }));
+  console.log('[shaper] warm-up', model, res);
+}
+const onFirstGesture = () => {
+  window.removeEventListener('keydown', onFirstGesture, true);
+  window.removeEventListener('mousedown', onFirstGesture, true);
+  gestured = true;
+  void warmUp();
+};
+window.addEventListener('keydown', onFirstGesture, true);
+window.addEventListener('mousedown', onFirstGesture, true);
 
 /**
  * Dev only: `?faultRate=0.5&fault=syntax&retryFails=1&seed=123` turns on the mock's faulty mode.
@@ -69,7 +172,16 @@ const validator = new Validator({
 // (webaudio, draw, codemirror, hydra, soundfonts, midi) become stubs there. Checks wait for this.
 Promise.resolve(mirror.prebaked)
   .catch((err: unknown) => console.error('[shaper] prebake failed', err))
-  .then(() => backend.init(liveScope()));
+  .then(() => {
+    backend.init(liveScope());
+    soundSummary = summariseSounds(Object.keys(soundMap.get()));
+  });
+
+/** A few loaded drum names for unknown-sample feedback. */
+const soundHint = () => {
+  const loaded = soundMap.get();
+  return COMMON_DRUMS.filter((d) => d in loaded).slice(0, 8).join(' ');
+};
 
 /** The names live code can call: the worker stubs the ones it can't load, and the model reference is filtered by them. */
 function liveScope() {
@@ -228,6 +340,7 @@ interface Timing {
   lastMs?: number; // last slot settled
   rawFirstMs?: number; // first option from the provider
   rawLastMs?: number;
+  provider?: string;
 }
 let timing: Timing | null = null;
 
@@ -292,10 +405,14 @@ async function streamOptions(effect: Extract<Effect, { type: 'startRequest' }>, 
   const startedAt = performance.now();
   const times: Timing = (timing = { requestId });
   render();
+  // Fix modes keep the mock's behaviour this milestone; shape goes to the selected provider.
+  const requestProvider = mode === 'shape' ? provider : mockProvider;
+  times.provider = mode === 'shape' ? undefined : `${mockProvider.name} (fix modes)`;
   await runRequest(
     {
-      provider,
+      provider: requestProvider,
       validator,
+      soundHint,
       getBuffer: () => view.state.doc.toString(),
       getRange: () => liveRange ?? capture.range,
       emit: (event) => {
@@ -307,7 +424,7 @@ async function streamOptions(effect: Extract<Effect, { type: 'startRequest' }>, 
         if (event.type === 'optionValidated') times.firstMs ??= ms;
         if (event.type === 'optionValidated' || event.type === 'optionDropped') times.lastMs = ms;
         if (event.type === 'requestDone') {
-          console.log('[shaper] request timing', { ...times, provider: provider.name });
+          console.log('[shaper] request timing', { ...times, stats: event.stats, error: event.error });
         }
         soakLog?.push(event);
         send(event);
@@ -406,6 +523,10 @@ window.addEventListener(
         e.preventDefault();
         e.stopPropagation();
         toggleSwapTiming();
+      } else if (e.code === 'KeyP') {
+        e.preventDefault();
+        e.stopPropagation();
+        cycleProvider();
       }
       return;
     }
@@ -443,7 +564,7 @@ trayEl.addEventListener('click', (e) => {
 
 // --- Render -----------------------------------------------------------------------------------
 
-const KEYS_HINT = '⌘/Ctrl+K shape · ⌘/Ctrl+J fix · ⌘/Ctrl+⇧J rewrite';
+const KEYS_HINT = '⌘/Ctrl+K shape · ⌘/Ctrl+J fix · ⌘/Ctrl+⇧J rewrite · Alt+P provider';
 
 function render() {
   const swap = `swap: ${quantizer.mode} (T)`;
@@ -466,21 +587,33 @@ function render() {
   const ms = (v?: number) => (v === undefined ? '…' : v < 1000 ? `${Math.round(v)} ms` : `${(v / 1000).toFixed(1)} s`);
   const count = (pred: (s: SlotCard) => boolean) => tray.slots.filter(pred).length;
   const checked = tray.validationMs.filter((v) => v > 0); // identical/duplicate never reach the evaluator
+  const stats = tray.stats;
+  const k = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+  const usage = stats?.tokens
+    ? `tokens ${k(stats.tokens.input + stats.tokens.cacheRead + stats.tokens.cacheWrite)} in (${k(stats.tokens.cacheRead)} cached) / ${k(stats.tokens.output)} out` +
+      (stats.costUsd !== undefined ? ` · $${stats.costUsd.toFixed(4)}` : '') +
+      (stats.calls > 1 ? ` · ${stats.calls} calls` : '')
+    : null;
   const status = [
-    `provider: ${providerLabel()}`,
+    `provider: ${times?.provider ?? providerLabel()}`,
     `first ${ms(times?.firstMs)}`,
     `last ${tray.done ? ms(times?.lastMs) : '…'}`,
     `${count((s) => s.status === 'ready')} ok · ${count((s) => !!s.retried)} retried · ${count((s) => s.status === 'dropped')} dropped`,
     checked.length
       ? `validation ${(checked.reduce((a, b) => a + b, 0) / checked.length).toFixed(1)} ms avg / ${Math.max(...checked).toFixed(1)} ms max`
       : 'validation …',
+    usage,
     tray.heard === 0 ? 'audition: off (original)' : `audition: on (option ${tray.heard})`,
     swap,
-  ].join(' · ');
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const hint = tray.stale
     ? '<span class="stale">Selection changed — options are stale. Playing the original. Esc to close.</span>'
     : '1–4 audition (Alt+1–4 from the editor) · 0/Esc original · Enter commit · R regenerate · Esc again closes';
-  const error = tray.error ? ` · <span class="stale">${escapeHtml(tray.error)}</span>` : '';
+  const error =
+    (tray.error ? ` · <span class="stale">${escapeHtml(tray.error)}</span>` : '') +
+    (tray.bufferError ? ` · <span class="stale" title="${escapeHtml(tray.bufferError)}">buffer has an error: ${escapeHtml(tray.bufferError.slice(0, 80))}</span>` : '');
   trayEl.innerHTML = `<div class="meta">${escapeHtml(status)}${error}</div><div class="meta">${hint}</div><div class="cards">${original}${options.join('')}</div>`;
   statusEl.textContent = `${KEYS_HINT} · ${swap.replace('(T)', '(Alt+T)')}`;
 }
@@ -510,8 +643,14 @@ function slotCard(slot: number, s: SlotCard, heard: Slot, original: string) {
     case 'failed': {
       const label = s.status === 'failed' ? `${s.option!.label} (failed)` : s.option!.label;
       const badges = (s.warnings ?? []).map((w) => (w === 'empty' ? 'empty' : `unknown sample: ${(s.unknownSounds ?? []).join(', ')}`));
+      if (s.checkedAlone) badges.push('checked alone');
       if (s.retried) badges.push('retried');
-      const title = s.retried && s.drop ? `Replaces an option dropped for ${why}: ${s.drop.message}` : undefined;
+      const title = [
+        s.retried && s.drop ? `Retried after ${why}: ${s.drop.message}` : '',
+        s.checkedAlone ? 'The buffer itself fails to evaluate, so this option was checked on its own. Auditioning it plays the whole buffer, which may fail.' : '',
+      ]
+        .filter(Boolean)
+        .join('\n') || undefined;
       return card(slot, classes, label, diffHtml(original, s.option!.code), { badges, title });
     }
   }
@@ -519,7 +658,7 @@ function slotCard(slot: number, s: SlotCard, heard: Slot, original: string) {
 
 function card(slot: number, classes: string[], label: string, body: string, extra: { title?: string; badges?: string[] } = {}) {
   const title = extra.title ? ` title="${escapeHtml(extra.title)}"` : '';
-  const badges = (extra.badges ?? []).map((b) => `<span class="badge${b === 'retried' ? ' info' : ''}">${escapeHtml(b)}</span>`).join('');
+  const badges = (extra.badges ?? []).map((b) => `<span class="badge${b === 'retried' || b === 'checked alone' ? ' info' : ''}">${escapeHtml(b)}</span>`).join('');
   return `<div class="card ${classes.join(' ')}" data-slot="${slot}"${title}><b>${slot}</b> ${escapeHtml(label)}${badges}<code>${body}</code></div>`;
 }
 
@@ -846,8 +985,9 @@ Object.assign(window, {
     validator,
     backend,
     get mock() {
-      return provider instanceof MockProvider ? provider : null;
+      return mockProvider;
     },
+    switchProvider,
     getState: () => state,
     /** Dev: the live scope and sound names, for src/generated/scope.json and sounds.json (npm run build:reference). */
     dumpScope: () => ({ ...liveScope(), sounds: Object.keys(soundMap.get()).sort() }),
