@@ -190,7 +190,7 @@ Everything below was checked in Chrome on macOS against `npm run dev`, with keys
 
 - Tray keys are ignored when ⌘, Ctrl or ⌥ is held, so ⌘R still reloads.
 - Plain digits typed in the editor still type digits (checked: `)` → `)1`).
-- **No shortcut changes were needed.** **Caveat:** the test keys were sent through the DevTools protocol, which goes straight to the page and may not pass through Chrome's own menu shortcuts. A physical ⌘J / ⌘⇧J still needs a quick hand check. If Chrome takes either one, the fallback is ⌘; / ⌘⇧; (change the `KeyJ` checks in `main.ts`).
+- **No shortcut changes were needed.** The test keys were sent through the DevTools protocol; physical ⌘J / ⌘⇧J were later confirmed by hand as well.
 
 ## Option tray
 
@@ -272,11 +272,9 @@ Use headphones. Reload, and **don't click**. Press ⌘K, then Esc, then Ctrl+Ent
 
 ## Open problems
 
-- **`silence()` was in the first reference** as if it were a function (it's a value), and parallel Haiku used it twice on "mute the pad" (`silence is not a function`, then retried). The reference now has a hand-written `silence` entry, and the signals (`sine`, `saw`, `rand`, …) are listed as values (`sine.range(…)`), not as `sine()`; a test checks it. The sweeps above ran before that fix.
-- **Physical ⌘J / ⌘⇧J** still need a hand check (see Keyboard).
 - **The `armed` window spans the whole async `repl.evaluate`** (a few ms, longer on the first eval while samples load). An outside Ctrl+Enter that lands inside that window would be quantized too. It's harmless (it just lands on the beat), but it isn't strictly "outside evals are immediate".
 - **The Drawer's look-back after settling.** Once a swap has landed, `settle()` swaps the stitched wrapper for the plain new pattern, so a Drawer query reaching back before `N` would see the new pattern. Highlighting only shows the present, so nothing visible changes; a painter using `drawTime[0] < 0` (e.g. `pianoroll`) could repaint the last ≤1 cycle with the new pattern.
-- **Fix modes skip the instruction box.** ⌘⇧J (intent rewrite) might want one once real models exist; `startCapture` in `main.ts` is the one place to change.
+- ~~**Fix modes skip the instruction box.**~~ Superseded in milestone 3: ⌘⇧J opens the instruction box.
 - **Widgets during audition** (from milestone 1) are still not handled.
 
 ---
@@ -670,4 +668,3 @@ Use headphones. Run `npm run dev` with the key in `.env`, open `/?provider=claud
 - **`src/generated/scope.json` and `sounds.json` are snapshots.** After a Strudel upgrade, run `await __shaper.saveScope()` in the dev page, then `npm run build:reference`; the reference test fails until the checked-in reference matches.
 - **The eval measures from the proxy app in-process**, so browser → proxy network time isn't included. Locally that is about 1 ms; the browser numbers seen in testing (first card 1.0–1.6 s) match.
 - **`silence()` was in the first reference** as if it were a function (it's a value), and parallel Haiku used it twice on "mute the pad" (`silence is not a function`, then retried). The reference now has a hand-written `silence` entry, and the signals (`sine`, `saw`, `rand`, …) are listed as values (`sine.range(…)`), not as `sine()`; a test checks it. The sweeps above ran before that fix.
-- **Physical ⌘J / ⌘⇧J** (from milestone 2) still haven't been checked by hand.
