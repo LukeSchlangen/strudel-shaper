@@ -18,11 +18,24 @@ export function captureRange(state: EditorState): Range {
     return { from: sel.from, to: sel.to };
   }
 
-  const line = state.doc.lineAt(sel.head);
+  return captureAt(state, sel.head);
+}
+
+/** The trimmed line at `pos`, without a trailing comma (what capture falls back to). */
+export function lineRangeAt(state: EditorState, pos: number): Range {
+  const line = state.doc.lineAt(pos);
   const lead = line.text.length - line.text.trimStart().length;
   const trimmed = line.text.trim().replace(/,$/, '').trimEnd();
-  const lineRange = { from: line.from + lead, to: line.from + lead + trimmed.length };
-  if (!trimmed) return { from: sel.head, to: sel.head };
+  return { from: line.from + lead, to: line.from + lead + trimmed.length };
+}
+
+/**
+ * The expression at `pos`, as ⌘K captures it with no selection: the largest expression that fits on
+ * that line (preferring the one under `pos`), else the trimmed line. ⌘J uses it at an error's position.
+ */
+export function captureAt(state: EditorState, pos: number): Range {
+  const lineRange = lineRangeAt(state, pos);
+  if (lineRange.from === lineRange.to) return { from: pos, to: pos };
 
   // The largest expressions that fit entirely on this line.
   const candidates: Range[] = [];
@@ -40,7 +53,7 @@ export function captureRange(state: EditorState): Range {
   if (candidates.length === 0) return lineRange;
   const size = (r: Range) => r.to - r.from;
   return (
-    candidates.find((r) => r.from <= sel.head && sel.head <= r.to) ??
+    candidates.find((r) => r.from <= pos && pos <= r.to) ??
     candidates.reduce((a, b) => (size(b) > size(a) ? b : a))
   );
 }

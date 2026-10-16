@@ -47,6 +47,16 @@ export class Validator {
     return r.ok ? { ok: true } : { ok: false, stage: r.stage, message: r.message };
   }
 
+  /** The raw check of `code`, with the events of `span` told apart: what ⌘J uses to find what to fix. */
+  inspect(code: string, span?: Span): Promise<CheckResult> {
+    return this.deps.backend.check(code, this.deps.cps(), span);
+  }
+
+  /** Whether a sound key is loaded (read only). */
+  hasSound(key: string): boolean {
+    return this.deps.hasSound(key);
+  }
+
   /**
    * Checks `option` spliced into `buffer` at `range`. `others` are the options already accepted for
    * this request. With a failing `baseline`, an option that fails the same way is checked on its own
@@ -105,7 +115,7 @@ export class Validator {
 }
 
 /** Same stage and same message, ignoring positions (an option with more lines moves the error). */
-export function sameError(a: { stage: CheckStage; message: string }, b: { stage: CheckStage; message: string }): boolean {
+export function sameError(a: { stage: string; message: string }, b: { stage: string; message: string }): boolean {
   const strip = (m: string) => m.replace(/\(\d+:\d+\)/g, '').replace(/\b(line|col(umn)?)\s*\d+/gi, '').trim();
   return a.stage === b.stage && strip(a.message) === strip(b.message);
 }
