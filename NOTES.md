@@ -1,3 +1,90 @@
+# Current state (read this first)
+
+Strudel Shaper is a browser Strudel live-coding editor. The user selects code and presses a key. The model returns 1–4 code options with 1–4 word labels, never prose. The user auditions them on the running clock and commits one.
+- ⌘K **shapes** the selection.
+- ⌘J makes a **minimal fix**.
+- ⌘⇧J makes an **intent rewrite**.
+
+Milestones 1–5 are done; the sections below are their history.
+
+## Run it
+
+| What | How |
+| --- | --- |
+| App + model proxy | `npm run dev` (Vite on :5173, proxy on 127.0.0.1:8787). Put `ANTHROPIC_API_KEY` in `.env` (see `.env.example`). Open `http://localhost:5173/?provider=claude`. Without `?provider` it uses the offline mock. |
+| Tests, build, key scan | `npm test` (408 tests, no network), `npm run build`, `npm run check:key`. All three must pass before a commit. |
+| Eval (costs cents) | `npm run eval -- --model claude-haiku-5-5` (shape, 20 requests). `npm run eval -- --mode fix --model claude-haiku-5-5` (fix, 15 requests). Add `--only id,id` or `--label x`. Reports go to `eval/reports/`. |
+| Listening | `http://localhost:5173/eval/listen.html` (dev server): N/P step through requests, 1–4 audition, 0 original. |
+| Prompt size | `npm run count:prompt` (free count_tokens endpoint) |
+| Reference | `npm run build:reference`. After a Strudel upgrade, first run `await __shaper.saveScope()` in the dev page. |
+| Dev console | `__shaper` gives `mirror`, `view`, `scheduler`, `quantizer`, `swapLog`, `validator`, `measure(n)`, `soak()` and `mock`. `?faultRate=0.5` turns on the faulty mock. |
+
+## Current defaults
+
+| Setting | Default | Where / override |
+| --- | --- | --- |
+| Model, shape (⌘K) | the header select (Haiku 5.5 when `?provider=claude`) | `?model=`, Alt+P |
+| Model, ⌘J minimal fix | **Haiku 5.5** | `MODE_DEFAULT_MODELS` (`server/providers/models.ts`); `?fixModel=` |
+| Model, ⌘⇧J rewrite | **Sonnet 5.5** | same; `?rewriteModel=` |
+| Thinking / effort | off / low, both models | `?thinking=` `?effort=` |
+| Strategy | `single` (one call per option set; fix modes always single) | `?strategy=parallel` (shape only) |
+| Swap timing | beat | T / Alt+T |
+| Warm-up | on, for the selected model | `?warmup=0` |
+| Limits | 4 options (2 for a minimal fix); `MAX_TOKENS` 2048; `RATE_LIMIT_PER_MIN` 20; 20 s upstream idle timeout | `.env` |
+| Validation | 250 ms per check (`VALIDATION_TIMEOUT_MS`); fingerprints over 8 cycles (`FINGERPRINT_CYCLES`) | `src/validator.ts`, `src/sandbox.ts` |
+| Fix cards | char diff when ≤ 12 changed runs (`MAX_CHAR_CHANGES`); `large change` badge above 20 characters (`LARGE_CHANGE_CHARS`) | `src/diff.ts` |
+
+## Rules no change may break
+
+- Import `@strudel/repl/repl-component.mjs`, never the package root. Keep the CodeMirror pins in `package.json` and `resolve.dedupe` in `vite.config.ts`.
+- **Auditioning:**
+  - Audition with `mirror.repl.evaluate(code)`.
+  - The Quantizer quantizes only our own evaluations (and snapshot restores).
+  - An outside evaluation (Ctrl+Enter, Play) resets the tray.
+  - Highlighting pauses and widgets are held while auditioning.
+- **Commit:** one `isolateHistory.of('full')` transaction, so one ⌘Z undoes it.
+- **Validation** runs only in the worker realm, never on the main thread.
+- **The API key** stays server-side: `npm run check:key` must pass.
+- **Nothing provider-specific in the browser:** every mode goes through the `Provider` interface, `RemoteProvider` and the NDJSON protocol (`src/remoteProtocol.ts`). A new model is a new server adapter.
+- **Fixes happen only when the user asks** (⌘J / ⌘⇧J). Nothing diagnoses or fixes code on its own.
+- **Prompt cache:** every mode's rules live in the cached system prompt (`server/prompt.ts` `ROLE`). Per-request text goes only in the user message.
+- No test calls the real API.
+
+## Where things live
+
+| Area | Files |
+| --- | --- |
+| Wiring, keys, rendering | `src/main.ts`, `src/style.css` |
+| Tray state machine | `src/trayMachine.ts` (effects incl. `snapshotPlaying` / `restoreSnapshot`) |
+| Capture and fix targets | `src/capture.ts` (`captureRange`, `captureAt`), `src/fixTarget.ts` (`diagnoseFix`, `trayFix`, `noRequestReason`), `src/errorPosition.ts` |
+| Validation | `src/validator.ts` (shape and fix rules), `src/sandbox.ts` (worker realm, fingerprint), `src/validator.worker.ts`, `src/pipeline.ts` (retries), `src/feedback.ts` |
+| Audio timing | `src/quantize.ts` (`Quantizer`: `swapTo`, `playing`) |
+| Diffs | `src/diff.ts` (word / char diffs, `changeSize`) |
+| Providers | `src/provider.ts`, `src/remoteProvider.ts` (`modelForMode`), `src/mockProvider.ts` |
+| Proxy | `server/app.ts`, `server/prompt.ts`, `server/providers/claude.ts`, `server/providers/models.ts` |
+| Eval | `eval/run.ts`, `eval/fixtures.json` (20 shape + 15 fix requests), `eval/summary.ts`, `src/listen.ts` |
+
+## Live open problems
+
+Most important first. Details are in the milestone sections.
+
+1. **"Checked alone" cards can't be heard** while the buffer fails elsewhere: auditioning plays the whole spliced buffer (M4). This also covers fixes when the buffer has a second error. An "audition alone" mode is out of scope so far.
+2. **The warm-up only warms the selected model.** The first ⌘⇧J of a session (Sonnet) pays the prompt-cache write: about $0.02 and a slower first card (M5).
+3. **Haiku often returns 3 shape options, not 4** (M4).
+4. **Models add numbers to control patterns** (`.add(2)` on `n(...)` or `note(...)`), which is a no-op in this Strudel version. The sounds-identical check now catches it and retries, but the reference could warn about it (M5).
+5. **Some broken code plays partly and isn't diagnosed as broken:** a bad chord name inside `<…>`, or `.gain("loud")`. ⌘J says "nothing to fix" (M5).
+6. **Validation is a snapshot:** edits made elsewhere after a card validates aren't rechecked. The audition-time `failed` state is the backstop (M3).
+7. **Stub fidelity:** draw, webaudio, codemirror, hydra and midi calls are assumed valid in the worker (M3).
+8. **"No pattern" is `=== silence`:** a buffer that is only `hush()` is dropped as an eval error (M3).
+9. **Option-scoped events need mini-notation in the option:** without it, events are counted over the whole buffer (M3).
+10. **`repl.state.code` / `isDirty`** track the auditioned code during audition. Nothing reads them yet (M1).
+11. **Widget glitches:** two `._scope()` widgets render wrongly (upstream). An option that adds a scope shifts the scope indexes during audition (M4).
+12. **Timing:** swap latency is fixed at about 150–250 ms by Strudel's look-ahead (M1). The `armed` window spans the whole async evaluate (M2). The Drawer's look-back after `settle()` sees the new pattern (M2).
+13. **Snapshots:** `src/generated/` and the sound summary are snapshots of the live scope; the summary lists only 12 drum machines in full (M4).
+14. **Eval and housekeeping:** the eval measures the proxy in-process, so network time is excluded (M4). Retries cost a full cached prompt each (M4). The worker isn't tested over hour-long sessions (M3). The mock runs out of transforms (M3). The bundle is 1.8 MB (M1).
+
+---
+
 # Milestone 1 notes: the audition spike
 
 Versions: `@strudel/repl` 1.3.0 (the latest on npm on 2026-10-15), `@strudel/codemirror` 1.3.0, `@strudel/core` 1.2.6. All are pinned exactly.
@@ -668,3 +755,186 @@ Use headphones. Run `npm run dev` with the key in `.env`, open `/?provider=claud
 - **`src/generated/scope.json` and `sounds.json` are snapshots.** After a Strudel upgrade, run `await __shaper.saveScope()` in the dev page, then `npm run build:reference`; the reference test fails until the checked-in reference matches.
 - **The eval measures from the proxy app in-process**, so browser → proxy network time isn't included. Locally that is about 1 ms; the browser numbers seen in testing (first card 1.0–1.6 s) match.
 - **`silence()` was in the first reference** as if it were a function (it's a value), and parallel Haiku used it twice on "mute the pad" (`silence is not a function`, then retried). The reference now has a hand-written `silence` entry, and the signals (`sine`, `saw`, `rand`, …) are listed as values (`sine.range(…)`), not as `sine()`; a test checks it. The sweeps above ran before that fix.
+
+---
+
+# Milestone 5 notes: fix modes on Claude
+
+⌘J (minimal fix) and ⌘⇧J (intent rewrite) now go to the selected provider through the same `Provider` → `RemoteProvider` → NDJSON path as shape mode. Before this they were always answered by the mock. Checked in Chrome on macOS against `npm run dev` (keys via the Claude in Chrome extension). `npm test` (408 tests), `npm run build` and `npm run check:key` pass. No test calls the real API.
+
+## Where Strudel's errors point
+
+Measured with the real transpiler and sandbox in `test/fixTarget.test.ts`, with the starter's hi-hat line broken:
+
+| Broken as | Stage | Message | Position |
+| --- | --- | --- | --- |
+| `.gian(0.6)` | eval | `s(...).gian is not a function` | none. The name is searched for |
+| `"hh*8["` | syntax | `[mini] parse error at line 4: …` | line only |
+| missing `"` | syntax | `Unterminated string constant (4:4)` | line:col (col is the opening quote) |
+| missing `)` | syntax | `Unexpected token (6:1)` | **two lines below**: the closing line of `stack(`. Lezer's error node is at the same place |
+| `silence()`, `sine()` | eval | `silence is not a function` | none. The name is searched for |
+| `.euclid(8, 3)` | eval | `Invalid array length` | none, and no name |
+| `.fast("double")` | query | `Invalid argument` | none |
+| `.scale("D:dorain")`, `chord("Hmaj7")`, `s(0.4).gain("hh*8")` | — | runs, but the line makes no sound | — |
+| `chord("<Cm7 Fxx>")`, `.lpf("x", 800)`, `.gain("loud")` | — | plays (at least partly) | not detected |
+
+Runtime errors carry no position because `core.evaluate` runs the *transpiled* code through `Function()`, so stacks point into generated code.
+
+## What ⌘J / ⌘⇧J operate on (`src/fixTarget.ts`)
+
+`diagnoseFix` runs only on the key press. It takes a few ms in the worker. In order:
+
+1. **The current buffer's baseline.** If that passes, it uses the live repl's last eval error, but only while the editor text equals the code of that failed outside eval.
+2. **Locating the error** (`src/errorPosition.ts`):
+   - `(L:C)` gives a position;
+   - `at line N` gives a line;
+   - for "X is not a function / defined", the unique occurrence of `X` outside strings and comments.
+   - **Syntax errors walk up** from the reported line to the first line that doesn't transpile on its own. They skip lines like `)` or `stack(`, and lines that start with `.`. This is what finds the missing `)` two lines above `(6:1)`.
+3. **Choosing the target with no selection:**
+   - a runtime error with a position → `captureAt(pos)`, the same syntax-tree logic as ⌘K;
+   - a syntax error → the whole trimmed line (the tree is unreliable there);
+   - no position → the cursor's expression, then each line's expression, checked alone, until one fails with the same error. Otherwise the result is `unknown`.
+4. **With a selection:** the error is inside it if its position is inside, or (with no position) if the selection alone fails the same way.
+   - If the error is outside, the selection is checked alone. If it's broken in its own way, that is what gets fixed, with `otherErrors` set so options are judged alone.
+   - Otherwise the result is `outside`.
+5. **When the buffer runs,** the target is still broken if it makes no sound. That means 0 onsets, or onsets with no playable sound key (`s(0.4)`). Unknown sounds count too.
+
+**What the keys do with the result:**
+- ⌘J on `ok`: the status line says **"nothing to fix: this code runs"** and no request is sent (checked: 0 fetches to `/api/options` with the cursor on a line, on line 1, and with a selection).
+- ⌘J on `outside`: "the error is on line N, outside the selection: …".
+- ⌘J on `unknown`: "can't tell where the error is (…). Select the broken code and press ⌘J."
+- ⌘⇧J always runs, including on working code. On `outside`, it rewrites the selection judged alone. **Changed from the plan:** the instruction box opens after the diagnosis rather than during it, because the box is placed at the diagnosed range.
+
+## Request and prompt
+
+- `OptionRequest` gained `errorAt?: { line?, inSelection, otherError? }`. Otherwise the shape is unchanged: `mode` and `error` are filled in.
+- **`ROLE` now has three sections** (shape, fix-minimal, fix-rewrite) under shared rules. All stay in the cached system block, so every mode shares one prompt cache.
+  - Minimal fix: 1 option, 2 only if genuinely ambiguous; change as little as possible and keep every musical choice; "values such as sine are not functions"; the label names the fix.
+  - Rewrite: 3–4 interpretations, restructuring allowed, follow the instruction.
+- **The user message** starts with `Mode: …`. In fix modes it adds "Problem in the marked code: <error> (buffer line N, line n of the marked code)", or that the error is outside the selection, plus any other error to leave alone. A minimal fix has no instruction line.
+- **Cost:** the role grew from about 800 to 1,345 tokens, so system block 1 went from about 5.1k to 5.68k tokens (`npm run count:prompt`). It is cached.
+- **Proxy limits:** at most 2 options for `fix-minimal`, 4 for the others. Fix modes ignore `strategy=parallel`.
+
+## Validation in fix modes (`Validator.validate(…, { fix })`)
+
+- **The fix test:** the option spliced into the **whole buffer** must transpile, evaluate and query, and make sound.
+  - Milestone 4's "same error as the buffer → checked alone / `buffer`" path is not used. There is no baseline in fix modes.
+- **The new reason `unfixed`:** the option still fails with the original error (positions ignored), or the original was silent and the option is still silent. Label "still broken". One retry with "This still fails with: <error>. Return code that fixes this error."
+- **Judged alone** (`checked alone` badge): when the buffer has another error outside the selection, or when the spliced buffer fails with a *new* error located outside the option.
+- `identical` and `duplicate` still apply. The sounds-identical check is skipped, since the original doesn't evaluate.
+- **A rewrite of working code** is validated like shape mode, with the baseline and the fingerprint.
+- **Change size** = characters inserted plus deleted (`diffChars`). It is reported per card.
+
+## Tray
+
+- **Character diffs:** minimal-fix cards diff by character. Each change is a solid coloured block, so a single `"` or `)` stands out. Whitespace-only changes show as `·` / `⏎`. More than 12 changed runs falls back to the word diff.
+- **Card 0** reads **"original (broken)"** when the original doesn't evaluate. The unused second minimal-fix slot is hidden.
+- **0/Esc on a broken original:**
+  - When the tray opens, `snapshotPlaying` stores `quantizer.playing()` (the pattern that is or will be playing) and the cps; a stopped clock stores `silence`.
+  - 0, Esc and a live `evalFailed` emit `restoreSnapshot`. It runs through the evaluation queue: `Quantizer.swapTo(snapshot)`, then `drawer.invalidate`. So the return lands on the beat like any swap.
+  - A regenerate keeps the snapshot it has.
+  - If the original still evaluates (a silent selection, a rewrite of working code), 0/Esc re-evaluate the editor as before.
+- **Commit** is unchanged: the fix is written in one transaction and the editor is evaluated, which now succeeds. One ⌘Z restores the broken original.
+- **Status line:** `fixing: <error> (line N) · provider: claude · <model that answered> · …`.
+
+**Verified in Chrome**, starter buffer, hi-hat line broken 8 ways (`gian`, `"hh*8[`, missing `"`, missing `)`, `silence()`, `sine()`, `euclid(8, 3)`, `fast("double")`), cursor on line 1:
+- every ⌘J produced a working fix with a visible char diff (e.g. `del:[`, `ins:)`, `del:( del:)`);
+- no card failed live;
+- every audition and every return landed on a quarter cycle, with the clock anchor kept;
+- 0 restored the *same pattern object* that played before ⌘J;
+- the clock kept running throughout.
+
+With a selection, the same 8 plus the scale typo and swapped `s`/`gain` arguments also gave working fixes. Enter committed, and one ⌘Z restored `s("hh*8".gain(0.6)` exactly.
+
+## "Sounds identical" check (all modes except fix)
+
+- **How it works:** the worker hashes every onset over `FINGERPRINT_CYCLES = 8` cycles, plus the tempo after evaluation (so a `setcps`-only change counts as different).
+  - Each onset contributes its whole span, plus its value as canonical JSON (sorted keys, Fractions as n/d, numbers to 1e-9, locations left out). The list is sorted and hashed with cyrb53.
+  - `baseline()` hashes the original buffer once per request.
+  - An option whose spliced buffer hashes the same is dropped as `identical` (`identicalBy: 'sound'`), labelled "sounds the same", with feedback "This option sounds exactly like the original. Change the sound."
+  - It is skipped when the baseline fails, for checked-alone options, and in fix modes.
+- **Randomness is deterministic.** `degradeBy`, `sometimes`, `rand`, `irand`, `shuffle` and `choose` hash the same across evaluations: Strudel seeds them from cycle time. `Math.random()` in user code hashes differently every time, so such an option is never taken for the original.
+- **Tests:**
+  - Caught: `.fast(1)`, `.sometimesBy(0.5, x => x)`, `.rarely(x => x)`, `.rev()` on a uniform pattern, the same events written out, `gain("0.6")`.
+  - Kept: `.degradeBy(0.5)` / `(0.3)`, `.sometimes(x => x.speed(2))`, a change only in the 4th cycle, a `<…>` mask, `.slow(4)`, a tempo change.
+  - **`.rarely()` with no function** isn't a no-op in Strudel 1.2.6: it silences the line (0 onsets), so it is caught as `empty` instead.
+  - The same results hold in the browser through the worker, at 2–6 ms per check.
+- **Cost:** about 2× a 2-cycle check (in-process median):
+
+  | Buffer | 2 cycles | 8 cycles + hash |
+  | --- | --- | --- |
+  | starter | 0.40 ms | 0.82 ms |
+  | effects | 0.69 ms | 1.74 ms |
+  | heavy (`hh*32` with rand, sometimes, ply, plus a 16-note `off`/`jux`) | 3.0 ms | 12.0 ms |
+
+  All far under the 250 ms limit.
+- **What it catches in practice:** adding a number to a control pattern (`.add("<0 0 0 12>")` after `.scale`, even `.add(7)` before it) is a **no-op**: the engine returns identical events.
+  - Haiku shape re-run: 1 option caught and retried.
+  - Re-checking the cards milestone 4 *shipped*: Haiku 2/69, Haiku parallel 1/78, Sonnet 0/75.
+  - The mock's own `.rev()` on `bd*4` / `hh*8` is caught too (8 times in the 30-request pipeline soak).
+
+## Fix eval (`npm run eval -- --mode fix`, 2026-10-16, thinking off, effort low)
+
+15 fixtures (`eval/fixtures.json`):
+- **11 minimal fixes:** misspelled method, mini bracket, missing quote, missing paren, argument type, argument order, `sine()`, `silence()`, scale typo, silent selection, and an error outside a broken selection. 6 use only a cursor.
+- **4 rewrite sketches:** a bass that should follow the chords (working code, with an instruction), a nested-array arpeggio, `euclid(3)`, and chord names passed to `note` (with an instruction).
+
+Requests are built by `diagnoseFix`, the browser's own code; a test checks that every fixture diagnoses as stated.
+
+| Run | Fix rate | First-try fix rate | First card p50 / p90 / max | Minimal change size p50 / p90 / max | Rewrite cards | Cost / request |
+| --- | --- | --- | --- | --- | --- | --- |
+| Haiku 5.5, run 1 | **15/15** | 14/15 | 1.26 / 3.92 / 6.29 s | 2 / 9 / 18 | 11/16 | $0.00021 |
+| Haiku 5.5, run 2 | 14/15 | 13/15 | 1.26 / 2.48 / 2.71 s | 2 / 9 / 18 | 12/16 | $0.00015 |
+| Sonnet 5.5 | **15/15** | **15/15** | 1.56 / 2.12 / 2.12 s | 2 / 9 / 18 | **16/16** | $0.00372 |
+| Haiku, rewrites only ×2 | 4/4, 4/4 | 2/4, 4/4 | 2.18 / 1.35 s p50 | — | 10/16, 13/16 | $0.0002 |
+| Sonnet, rewrites only ×2 | 4/4, 4/4 | 4/4, 4/4 | 1.65 / 1.33 s p50 | — | 16/16, 16/16 | $0.0044 |
+
+- **Minimal fixes are the same from both models.** All 11 changes were character-for-character equal: `gain not gian` (2), `close the quote` (1), `remove stray bracket` (1), `swap euclid args` (4), `double is 2` (9), `sine is a value` (2), `dorian not dorain` (2), `swap s and gain` (18). Every model returned exactly one option, never the optional second.
+- **Haiku's latency outliers** (6.3 s, 3.9 s) wrote only ~40 output tokens: that is time to first token on the API side. The second run had none over 2.7 s.
+- **Rewrites differ:**
+  - Sonnet returned 4 working interpretations on the first try in all 12 rewrite requests.
+  - Haiku returned 2–4. In one run it kept the broken `note("Cm7 Fm7")` in all four options of `rewrite-chord-names`, so every card was silent. That led to the rule "still silent when the original was silent → `unfixed`"; with it, the reruns fixed all four sketches.
+- **`LARGE_CHANGE_CHARS = 20`.** The 33 working minimal fixes across three runs changed 1–9 characters (p90 9), except the argument swap at 18. The 94 rewrite cards changed 6 (p10) / 30 (p50) / 65 (p90) characters. 20 sits above every real minimal fix and below most rewrites.
+
+**Recommendation, implemented:**
+- **Minimal fix → Haiku 5.5.** Same fixes as Sonnet, at about 1/18 of the cost, with a faster p50.
+- **Rewrite → Sonnet 5.5.** It always fills four working cards on the first try, for about $0.004 per request.
+
+How it works:
+- The proxy picks the model when the browser doesn't name one: `MODE_DEFAULT_MODELS` in `server/providers/models.ts`.
+- `?fixModel=` / `?rewriteModel=` override it; ⌘K still uses the header select.
+- The `done` line echoes the model, so the status line shows which one answered.
+- Verified in the browser: ⌘⇧J on working hats (no instruction, and "make it swing") and on a sketch bass line (`note([...]).s(sawtooth)`, without an instruction and with "a bouncy bassline") each gave 4 working Sonnet cards. The page sent no model.
+
+## Shape re-run (Haiku 5.5, thinking off, effort low, after the prompt change)
+
+| Run | First card p50 / p90 / max | ≤ 2 s | Pass rate, first attempt | Cards shown | Cost / request |
+| --- | --- | --- | --- | --- | --- |
+| M4 (2026-10-15) | 1.28 / 2.38 / 2.40 s | 17/20 | 97% (67/69) | 69/80 | $0.0003 |
+| M5 (2026-10-16) | 1.59 / 2.03 / 2.15 s | 17/20 | 96% (68/71) | 70/80 | $0.00024 |
+
+The sounds-identical check caught **1** option: `melody-empty`, `.add("<0 0 0 12>")` after `.scale`. It was retried and replaced. The p50 rose by 0.3 s and p90 fell, with one run each; part of that may be the larger prompt.
+
+## Listening checklist (milestone 5)
+
+Use headphones. Run `npm run dev`, open `/?provider=claude`, then Ctrl+Enter.
+
+- [ ] Delete the `)` after `"hh*8"` (don't evaluate). The music keeps playing the last good pattern. Put the cursor on line 1 and press ⌘J. Within about 1.5 s: card 0 "original (broken)", card 1 with a green `)` block, and the status line "fixing: Unexpected token (6:1) (line 4)".
+- [ ] Press `1`: the fix lands on the beat (the hats sound the same as before you broke them). Press `0`: the last good pattern comes back on the beat, not the fix. Press `1` then Enter: the line is fixed and the editor evaluates. One ⌘Z restores the broken line.
+- [ ] Repeat with `.gian(0.6)`, `"hh*8[`, a missing `"`, `silence()` in place of the hats, `.gain(sine())`, `.euclid(8, 3)` and `.fast("double")`, both with the cursor elsewhere and with the line selected. Each gives a small, exact char diff.
+- [ ] ⌘J on the unbroken starter, anywhere: the status line says "nothing to fix: this code runs" and the proxy logs no request.
+- [ ] Select the hats and break the kick line (`.gian(2)`) too: ⌘J says "the error is on line 3, outside the selection". With the hats also broken (`.fast("double")`), ⌘J fixes the hats with a `checked alone` badge.
+- [ ] ⌘⇧J on the working hats, Enter (no instruction): 4 rewrites, and the status line says `sonnet-5-5`. Again with "make it swing".
+- [ ] Turn the bass into `note(["c2", "eb2", ["g2", "bb2"]]).s(sawtooth)`, select it, ⌘⇧J with and without "a bouncy bassline": 4 working interpretations each, with word diffs.
+- [ ] ⌘K on the melody with no instruction several times. If a card would play exactly the original (an `.add(n)` after `.scale`), it never appears: the slot shows `retrying… (sounds the same)`.
+- [ ] `/eval/listen.html`, choose a `fix-…` report: card 0 reads "original (broken)", minimal fixes show char diffs and their size, and 0 doesn't evaluate the broken buffer.
+
+## Open problems
+
+- **The warm-up only warms the selected model.** The first ⌘⇧J of a session on Sonnet paid the cache write in the browser ($0.0232 for that request; $0.0034 once cached). Warming Sonnet on every page load would cost about $0.02 even when ⌘⇧J is never used.
+- **Partly broken code isn't diagnosed:** a bad chord name inside `<…>` (the other chords play), `.lpf("x", 800)`, `.gain("loud")`. ⌘J says "nothing to fix".
+- **Some live errors are only logged.** A scale typo logs `Scale name D dorain is incomplete` on every scheduler tick live, while the worker's query just returns 0 onsets. Diagnosis catches it as silent, but the console fills up until it's fixed.
+- **The second minimal-fix slot was never used** in the eval (all 33 minimal-fix requests across three runs returned 1 option). It stays hidden unless filled.
+- **Rewrites of working code** are validated like shape mode, so a rewrite that sounds exactly like the original is retried. That's arguably right for "rewrite", but untested by ear.
+- **Seen once and not reproduced:** while two scripted test runs overlapped in the same page, the clock stopped (`[cyclist] stop`) with no app code running. In a clean run of all 8 broken-line cases, the clock never stopped.
+- **The reference doesn't warn** that `.add(number)` on `n()`/`note()` patterns does nothing. The sounds-identical check catches it after the fact, at the cost of a retry.
