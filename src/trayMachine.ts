@@ -1,4 +1,5 @@
 import type { RetryReason } from './feedback';
+import type { TrayFix } from './fixTarget';
 import type { RequestStats } from './pipeline';
 import type { Mode, Option } from './provider';
 import type { Capture } from './splice';
@@ -36,6 +37,8 @@ export interface TrayRequest {
   capture: Capture;
   mode: Mode;
   instruction: string;
+  /** Fix modes: what was diagnosed (src/fixTarget.ts). */
+  fix?: TrayFix;
 }
 
 export interface Tray extends TrayRequest {
@@ -103,16 +106,18 @@ export interface Transition {
 
 export const initialState: TrayState = { kind: 'playing' };
 
-export const slotCount = (mode: Mode) => (mode === 'shape' ? 4 : 1);
+/** Shape and rewrite: 3–4 options. A minimal fix is 1 option, 2 when the intent is ambiguous. */
+export const slotCount = (mode: Mode) => (mode === 'fix-minimal' ? 2 : 4);
 
 const stay = (state: TrayState): Transition => ({ state, effects: [] });
 
 function openTray(req: TrayRequest, requestId: number): Transition {
-  const { capture, mode, instruction } = req;
+  const { capture, mode, instruction, fix } = req;
   const slots = Array.from({ length: slotCount(mode) }, (): SlotCard => ({ status: 'pending' }));
+  const withFix = fix ? { fix } : {};
   return {
-    state: { kind: 'tray', capture, mode, instruction, requestId, slots, done: false, heard: 0, stale: false, validationMs: [] },
-    effects: [{ type: 'startRequest', requestId, capture, mode, instruction }],
+    state: { kind: 'tray', capture, mode, instruction, ...withFix, requestId, slots, done: false, heard: 0, stale: false, validationMs: [] },
+    effects: [{ type: 'startRequest', requestId, capture, mode, instruction, ...withFix }],
   };
 }
 

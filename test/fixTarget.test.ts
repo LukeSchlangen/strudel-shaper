@@ -3,7 +3,7 @@ import { EditorState } from '@codemirror/state';
 import { javascript } from '@codemirror/lang-javascript';
 import { ensureSyntaxTree } from '@codemirror/language';
 import { codeOccurrences, locateError } from '../src/errorPosition';
-import { diagnoseFix, type Diagnosis } from '../src/fixTarget';
+import { diagnoseFix, noRequestReason, trayFix, type Diagnosis } from '../src/fixTarget';
 import { STARTER_CODE } from '../src/options';
 import { Sandbox } from '../src/sandbox';
 import { Validator } from '../src/validator';
@@ -134,5 +134,41 @@ describe('diagnoseFix with an explicit selection', () => {
 
   it('a working selection in a working buffer: nothing to fix', async () => {
     expect((await diagnose(STARTER_CODE, { select: HH })).d.kind).toBe('ok');
+  });
+});
+
+describe('from diagnosis to request', () => {
+  const r = { from: 0, to: 5 };
+  const err = { stage: 'eval' as const, message: 's(...).gian is not a function', line: 3, pos: 20 };
+
+  it('⌘J sends nothing for code that runs, an error outside the selection, or an error it can’t place', () => {
+    expect(noRequestReason({ kind: 'ok', range: r }, 'fix-minimal')).toBe('nothing to fix: this code runs');
+    expect(noRequestReason({ kind: 'outside', range: r, error: err }, 'fix-minimal')).toBe('the error is on line 3, outside the selection: s(...).gian is not a function');
+    expect(noRequestReason({ kind: 'unknown', range: r, error: { stage: 'eval', message: 'Invalid array length' } }, 'fix-minimal')).toMatch(/^can't tell where the error is \(Invalid array length\)/);
+    expect(noRequestReason({ kind: 'broken', range: r, error: err }, 'fix-minimal')).toBeNull();
+  });
+
+  it('⌘⇧J always runs: a rewrite is useful on working code too', () => {
+    for (const d of [{ kind: 'ok', range: r }, { kind: 'outside', range: r, error: err }] as Diagnosis[]) expect(noRequestReason(d, 'fix-rewrite')).toBeNull();
+  });
+
+  it('the end to end "nothing to fix" path: the starter buffer sends nothing on ⌘J', async () => {
+    const { d } = await diagnose(STARTER_CODE, { cursor: STARTER_CODE.indexOf(HH) });
+    expect(noRequestReason(d, 'fix-minimal')).toBe('nothing to fix: this code runs');
+  });
+
+  it('maps each diagnosis to the request fields, the validation context and whether the original evaluates', () => {
+    expect(trayFix({ kind: 'ok', range: r })).toEqual({ broken: false });
+    expect(trayFix({ kind: 'broken', range: r, error: err })).toEqual({
+      broken: true,
+      error: err.message,
+      errorAt: { line: 3, inSelection: true },
+      context: { originalError: { stage: 'eval', message: err.message }, judgeAlone: false },
+    });
+    // A silent selection: the buffer still evaluates, so 0/Esc can re-evaluate it.
+    expect(trayFix({ kind: 'broken', range: r, error: { stage: 'silent', message: 'It runs but makes no sound.' } }).broken).toBe(false);
+    const other = trayFix({ kind: 'broken', range: r, error: { stage: 'query', message: 'Invalid argument' }, otherErrors: err });
+    expect(other).toMatchObject({ broken: true, errorAt: { inSelection: true, otherError: { message: err.message, line: 3 } }, context: { judgeAlone: true } });
+    expect(trayFix({ kind: 'outside', range: r, error: err })).toMatchObject({ broken: true, errorAt: { line: 3, inSelection: false }, context: { judgeAlone: true } });
   });
 });

@@ -1,9 +1,10 @@
 import type { EditorState } from '@codemirror/state';
 import { captureAt, lineRangeAt } from './capture';
 import { locateError } from './errorPosition';
+import type { ErrorAt, Mode } from './provider';
 import type { CheckResult, CheckStage } from './sandbox';
 import type { Range } from './splice';
-import { sameError, tempoLines, type Validator } from './validator';
+import { sameError, tempoLines, type FixContext, type Validator } from './validator';
 
 /**
  * What ⌘J / ⌘⇧J operate on, and why. Runs only when the user presses one of them: nothing here
@@ -164,10 +165,64 @@ async function soundProblem(validator: DiagnoseInput['validator'], buffer: strin
 }
 
 function eventProblem(validator: DiagnoseInput['validator'], events: { eventCount: number; sounds: string[] }): FixError | null {
-  if (events.eventCount === 0) return { stage: 'silent', message: 'This code runs but makes no sound.' };
+  if (events.eventCount === 0) return { stage: 'silent', message: 'It runs but makes no sound.' };
   const unknown = events.sounds.filter((s) => !validator.hasSound(s));
   if (unknown.length) {
     return { stage: 'unknown-sample', message: `${unknown.map((s) => `\`${s}\``).join(', ')} ${unknown.length > 1 ? 'are not loaded sounds' : 'is not a loaded sound'}.` };
   }
   return null;
+}
+
+/** What a fix-mode tray carries: the request's error fields, the validation context, and whether the original evaluates. */
+export interface TrayFix {
+  /** The original doesn't evaluate: card 0 is "original (broken)", and 0/Esc restore what played before the tray. */
+  broken: boolean;
+  error?: string;
+  errorAt?: ErrorAt;
+  /** Validation in fix modes; absent when the code runs (a rewrite of working code is checked like shape mode). */
+  context?: FixContext;
+}
+
+const evaluates = (stage: FixStage) => stage === 'silent' || stage === 'unknown-sample';
+
+/** The status line instead of a request: ⌘J on code that runs, on a selection while the error is elsewhere, or when nothing could be found. */
+export function noRequestReason(d: Diagnosis, mode: Mode): string | null {
+  if (mode !== 'fix-minimal') return null; // a rewrite is useful on any code
+  switch (d.kind) {
+    case 'ok':
+      return 'nothing to fix: this code runs';
+    case 'outside':
+      return d.error.line
+        ? `the error is on line ${d.error.line}, outside the selection: ${d.error.message}`
+        : `the buffer fails outside the selection: ${d.error.message}`;
+    case 'unknown':
+      return `can't tell where the error is (${d.error.message}). Select the broken code and press ⌘J.`;
+    case 'broken':
+      return null;
+  }
+}
+
+export function trayFix(d: Diagnosis): TrayFix {
+  switch (d.kind) {
+    case 'ok':
+      return { broken: false };
+    case 'broken': {
+      const other = d.otherErrors;
+      return {
+        broken: !!other || !evaluates(d.error.stage),
+        error: d.error.message,
+        errorAt: { line: d.error.line, inSelection: true, ...(other ? { otherError: { message: other.message, line: other.line } } : {}) },
+        context: { originalError: { stage: d.error.stage, message: d.error.message }, judgeAlone: !!other },
+      };
+    }
+    case 'outside':
+    case 'unknown':
+      // ⌘⇧J only: rewrite the selection, judged on its own, since the buffer fails elsewhere.
+      return {
+        broken: true,
+        error: d.error.message,
+        errorAt: { line: d.error.line, inSelection: false },
+        context: { originalError: { stage: d.error.stage, message: d.error.message }, judgeAlone: true },
+      };
+  }
 }

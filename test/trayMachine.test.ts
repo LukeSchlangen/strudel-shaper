@@ -182,9 +182,11 @@ describe('tray state machine: streaming', () => {
     expect(state.kind === 'tray' && state.slots.map((s) => s.status)).toEqual(['ready', 'empty', 'empty', 'empty']);
   });
 
-  it('fix modes have a single slot', () => {
-    const { state } = run([{ ...request, mode: 'fix-minimal', instruction: '' } as TrayEvent]);
-    expect(state.kind === 'tray' && state.slots).toHaveLength(1);
+  it('a minimal fix has two slots (one fix, or two for an ambiguous intent); a rewrite has four', () => {
+    const minimal = run([{ ...request, mode: 'fix-minimal', instruction: '' } as TrayEvent]).state;
+    expect(minimal.kind === 'tray' && minimal.slots).toHaveLength(2);
+    const rewrite = run([{ ...request, mode: 'fix-rewrite' } as TrayEvent]).state;
+    expect(rewrite.kind === 'tray' && rewrite.slots).toHaveLength(4);
   });
 
   it('closing with Esc or Enter aborts a request in flight, but not a finished one', () => {
@@ -312,8 +314,8 @@ describe('tray state machine: validation', () => {
       { type: 'optionArrived', requestId: 1, slot: 4, option: opt(4) },
     ]);
     expect(slotsOf(state).map((s) => s.status)).toEqual(['pending', 'pending', 'pending', 'validating']);
-    const fix = run([{ ...request, mode: 'fix-minimal', instruction: '' } as TrayEvent, raw(2)]).state;
-    expect(slotsOf(fix).map((s) => s.status)).toEqual(['pending']);
+    const fix = run([{ ...request, mode: 'fix-minimal', instruction: '' } as TrayEvent, raw(3)]).state;
+    expect(slotsOf(fix).map((s) => s.status)).toEqual(['pending', 'pending']);
   });
 
   it('stale clears slots still validating or retrying', () => {

@@ -6,10 +6,21 @@ export interface OptionRequest {
   buffer: string; // full editor text
   selection: { from: number; to: number; text: string };
   instruction: string; // may be empty
-  error?: string; // current eval error, if any
+  error?: string; // current eval error, if any; in fix modes, the error being fixed
+  /** Fix modes: where `error` is, and whether the buffer also fails outside the selection. */
+  errorAt?: ErrorAt;
   cps: number;
   /** Set when asking for a replacement for one option that failed validation. */
   feedback?: { previousCode: string; error: string };
+}
+
+export interface ErrorAt {
+  /** 1-based buffer line, when it can be told. */
+  line?: number;
+  /** Whether the error is inside the selection (false: ⌘⇧J on a selection while another line fails). */
+  inSelection: boolean;
+  /** The buffer also fails outside the selection, with this error. */
+  otherError?: { message: string; line?: number };
 }
 
 /** `code` replaces the selection only. */

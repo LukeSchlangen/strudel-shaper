@@ -197,13 +197,16 @@ export class MockProvider implements Provider {
       // A replacement for one failed option: one option, valid unless retryFails.
       const candidates = req.mode === 'shape' ? shuffle(TRANSFORMS, rand) : FIX_CANDIDATES;
       const fresh = candidates.find((t) => !this.taken.has(append(t.suffix))) ?? candidates[0];
-      planned = [{ label: fresh.label, code: append(fresh.suffix) }];
+      const balanced = req.mode === 'fix-minimal' ? naiveBalance(body) : body;
+      planned = [balanced !== body && !this.taken.has(balanced + tail[0]) ? { label: 'mock fix', code: balanced + tail[0] } : { label: fresh.label, code: append(fresh.suffix) }];
       this.taken.add(planned[0].code); // now, since several replacements can be pending at once
     } else {
       planned =
         req.mode === 'shape'
           ? pickTransforms(req.instruction, rand).map((t) => ({ label: t.label, code: append(t.suffix) }))
-          : [{ label: FIX_CANDIDATES[0].label, code: append(FIX_CANDIDATES[0].suffix) }];
+          : req.mode === 'fix-minimal' && naiveBalance(body) !== body
+            ? [{ label: 'mock fix', code: naiveBalance(body) + tail[0] }]
+            : [{ label: FIX_CANDIDATES[0].label, code: append(FIX_CANDIDATES[0].suffix) }];
       this.taken = new Set(planned.map((p) => p.code));
     }
 
@@ -220,6 +223,38 @@ export class MockProvider implements Provider {
       yield option;
     }
   }
+}
+
+/**
+ * The mock's minimal fix, for offline demos: close a string left open (before the next `)`), drop
+ * or close unbalanced mini-notation brackets inside strings, then close parens left open. Anything
+ * else (a misspelled name, a wrong argument) it can't fix, and returns the code unchanged.
+ */
+export function naiveBalance(code: string): string {
+  let out = code;
+  if ((out.match(/"/g) ?? []).length % 2 === 1) {
+    const open = out.lastIndexOf('"');
+    const close = out.indexOf(')', open);
+    out = close < 0 ? out + '"' : out.slice(0, close) + '"' + out.slice(close);
+  }
+  out = out.replace(/"([^"]*)"/g, (_m, inner: string) => {
+    const missing = closers(inner, '[<{', ']>}');
+    // A stray opener at the very end ("hh*8[") was most likely typed by accident: drop it.
+    if (missing.length === 1 && /[[<{]$/.test(inner)) return `"${inner.slice(0, -1)}"`;
+    return `"${inner}${missing}"`;
+  });
+  return out + closers(out.replace(/"[^"]*"/g, '""'), '([', ')]');
+}
+
+/** The closing brackets `s` is missing, innermost first. Extra closers are ignored. */
+function closers(s: string, opens: string, closes: string): string {
+  const stack: string[] = [];
+  for (const c of s) {
+    const o = opens.indexOf(c);
+    if (o >= 0) stack.push(closes[o]);
+    else if (closes.includes(c) && stack.at(-1) === c) stack.pop();
+  }
+  return stack.reverse().join('');
 }
 
 /** The same code with harmless extra whitespace, which the validator's normalization must see through. */

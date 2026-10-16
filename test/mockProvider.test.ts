@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import * as core from '@strudel/core';
 import * as mini from '@strudel/mini';
 import { transpiler } from '@strudel/transpiler';
-import { FAULT_KINDS, MockProvider, TRANSFORMS, type FaultKind, type Sleep } from '../src/mockProvider';
+import { FAULT_KINDS, MockProvider, TRANSFORMS, naiveBalance, type FaultKind, type Sleep } from '../src/mockProvider';
 import { Sandbox } from '../src/sandbox';
 import { Validator, type ValidationResult } from '../src/validator';
 import type { Mode, Option, OptionRequest } from '../src/provider';
@@ -88,11 +88,28 @@ describe('MockProvider', () => {
     }
   });
 
-  it('fix modes return one option, a musical no-op (unchanged would be dropped as identical)', async () => {
+  it('fix modes return one option: a musical no-op when there is nothing the mock can balance', async () => {
     for (const mode of ['fix-minimal', 'fix-rewrite'] as Mode[]) {
       const opts = await collect(noDelay().generateOptions(request('', mode), new AbortController().signal));
       expect(opts).toEqual([{ id: expect.any(String), label: 'mock fix (no-op)', code: HH + '.fast(1)' }]);
     }
+  });
+
+  it.each([
+    ['a missing quote', 's("hh*8).gain(0.6)', 's("hh*8").gain(0.6)'],
+    ['a stray mini-notation bracket', 's("hh*8[").gain(0.6)', 's("hh*8").gain(0.6)'],
+    ['an unclosed mini-notation group', 's("hh [hh hh").gain(0.6)', 's("hh [hh hh]").gain(0.6)'],
+    ['a missing closing paren', 's("hh*8").gain(0.6', 's("hh*8").gain(0.6)'],
+    ['nothing it can see', 's("hh*8").gian(0.6)', 's("hh*8").gian(0.6)'],
+  ])('naiveBalance: %s', (_name, broken, fixed) => {
+    expect(naiveBalance(broken)).toBe(fixed);
+  });
+
+  it('fix-minimal on a missing quote returns the balanced code, labelled "mock fix"', async () => {
+    const broken = 's("hh*8).gain(0.6)';
+    const req = { ...request('', 'fix-minimal'), selection: { from: 0, to: broken.length, text: broken } };
+    const opts = await collect(noDelay().generateOptions(req, new AbortController().signal));
+    expect(opts).toEqual([{ id: expect.any(String), label: 'mock fix', code: HH }]);
   });
 
   it('stops yielding once aborted', async () => {

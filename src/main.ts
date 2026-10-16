@@ -7,6 +7,7 @@ import { StateEffect } from '@codemirror/state';
 import { captureRange } from './capture';
 import { commitSpec } from './commit';
 import { diffSegments } from './diff';
+import { diagnoseFix, noRequestReason, trayFix, type TrayFix } from './fixTarget';
 import { InstructionBox } from './instructionBox';
 import { InstructionHistory } from './instructionHistory';
 import { FAULT_KINDS, MockProvider, type FaultKind } from './mockProvider';
@@ -41,7 +42,7 @@ document.getElementById('stop')!.addEventListener('click', () => mirror.stop());
 
 // --- Providers --------------------------------------------------------------------------------
 
-/** The mock stays available offline, and keeps handling the fix modes (⌘J / ⌘⇧J) for now. */
+/** The mock stays available offline (its minimal fix only balances brackets and quotes). */
 const mockProvider = new MockProvider({ seed: Date.now() >>> 0, ...devMockOptions() });
 
 /** What the header select and Alt+P cycle through. `?provider=mock|claude&model=…` picks the first one. */
@@ -275,12 +276,15 @@ function evaluateCode(code: string, label: string, audition?: { range: Range }):
 let wasPending = false;
 let outsidePending = false;
 let wasStarted = false;
+/** The editor text of the last outside evaluation and its error, for ⌘J (only while the text is unchanged). */
+let lastOutsideEval: { code: string; error?: string } | null = null;
 host.addEventListener('update', (e) => {
   const st = (e as CustomEvent).detail;
   if (st.pending && !wasPending) outsidePending = !ownEval;
   if (!st.pending && wasPending) {
     // A failed outside eval leaves the old pattern playing, so the tray is still right.
     if (outsidePending && !st.evalError) send({ type: 'externalEval' });
+    if (outsidePending) lastOutsideEval = { code: mirror.code, error: st.evalError?.message };
     outsidePending = false;
   }
   if (wasStarted && !st.started) quantizer.settle(true); // stop() resets lastEnd to 0
@@ -414,25 +418,24 @@ async function run(effect: Effect) {
 }
 
 async function streamOptions(effect: Extract<Effect, { type: 'startRequest' }>, signal: AbortSignal) {
-  const { requestId, mode, instruction, capture } = effect;
+  const { requestId, mode, instruction, capture, fix } = effect;
   const range = liveRange ?? capture.range;
   const req: OptionRequest = {
     mode,
     buffer: view.state.doc.toString(),
     selection: { ...range, text: capture.text },
     instruction,
-    error: mirror.repl.state.evalError?.message,
+    // Fix modes: the diagnosed error. Shape: the live repl's, as context.
+    error: mode === 'shape' ? mirror.repl.state.evalError?.message : fix?.error,
+    ...(fix?.errorAt ? { errorAt: fix.errorAt } : {}),
     cps: scheduler.cps,
   };
   const startedAt = performance.now();
   const times: Timing = (timing = { requestId });
   render();
-  // Fix modes keep the mock's behaviour this milestone; shape goes to the selected provider.
-  const requestProvider = mode === 'shape' ? provider : mockProvider;
-  times.provider = mode === 'shape' ? undefined : `${mockProvider.name} (fix modes)`;
   await runRequest(
     {
-      provider: requestProvider,
+      provider,
       validator,
       soundHint,
       getBuffer: () => view.state.doc.toString(),
@@ -456,6 +459,7 @@ async function streamOptions(effect: Extract<Effect, { type: 'startRequest' }>, 
     req,
     slotCount(mode),
     signal,
+    fix?.context,
   );
 }
 
@@ -466,6 +470,7 @@ const box = new InstructionBox(view, history);
 
 function startCapture(mode: Mode) {
   if (state.kind === 'committed') return;
+  if (mode !== 'shape') return void startFix(mode);
   const range = captureRange(view.state);
   if (range.from === range.to) {
     statusEl.textContent = 'Nothing to capture here. Select some code or move to a line with code.';
@@ -473,19 +478,57 @@ function startCapture(mode: Mode) {
   }
   const buffer = view.state.doc.toString();
   const cap: Capture = { range, text: buffer.slice(range.from, range.to), buffer };
-  // Minimal fix goes straight to the tray; shape and intent rewrite ask for an instruction (empty is fine).
-  if (mode === 'fix-minimal') submit(cap, mode, '');
-  else box.open(range, (instruction) => submit(cap, mode, instruction));
+  box.open(range, (instruction) => submit(cap, mode, instruction));
 }
 
-function submit(cap: Capture, mode: Mode, instruction: string) {
+/**
+ * ⌘J / ⌘⇧J: find what is broken (the error's expression, else the selection or cursor line), only
+ * because the user asked. A minimal fix of code that runs sends nothing. Takes a few ms in the worker.
+ */
+async function startFix(mode: Exclude<Mode, 'shape'>) {
+  const buffer = view.state.doc.toString();
+  const sel = view.state.selection.main;
+  const selection = sel.empty ? null : captureRange(view.state);
+  const liveError = lastOutsideEval?.code === buffer ? lastOutsideEval.error : undefined;
+  statusEl.textContent = 'checking the code…';
+  let diagnosis;
+  try {
+    diagnosis = await diagnoseFix({ state: view.state, selection, validator, liveError });
+  } catch (err) {
+    console.error('[shaper] diagnosis failed', err);
+    statusEl.textContent = `couldn't check the code: ${String((err as Error)?.message ?? err)}`;
+    return;
+  }
+  console.log('[shaper] fix target', diagnosis);
+  if (view.state.doc.toString() !== buffer) {
+    statusEl.textContent = 'The code changed while it was being checked. Press ⌘/Ctrl+J again.';
+    return;
+  }
+  const reason = noRequestReason(diagnosis, mode);
+  if (reason) {
+    statusEl.textContent = reason;
+    return;
+  }
+  const { range } = diagnosis;
+  if (range.from === range.to) {
+    statusEl.textContent = 'Nothing to capture here. Select some code or move to a line with code.';
+    return;
+  }
+  const cap: Capture = { range, text: buffer.slice(range.from, range.to), buffer };
+  const fix = trayFix(diagnosis);
+  // Minimal fix goes straight to the tray; intent rewrite asks for an instruction (empty is fine).
+  if (mode === 'fix-minimal') submit(cap, mode, '', fix);
+  else box.open(range, (instruction) => submit(cap, mode, instruction, fix));
+}
+
+function submit(cap: Capture, mode: Mode, instruction: string, fix?: TrayFix) {
   if (!isRangeIntact(view.state.doc.toString(), cap.range, cap.text)) {
     statusEl.textContent = 'The selection changed while the box was open. Press ⌘/Ctrl+K again.';
     return;
   }
   history.add(instruction);
   liveRange = cap.range;
-  send({ type: 'request', requestId: ++requestSeq, capture: cap, mode, instruction });
+  send({ type: 'request', requestId: ++requestSeq, capture: cap, mode, instruction, ...(fix ? { fix } : {}) });
   trayEl.focus();
 }
 

@@ -63,6 +63,57 @@ describe('buildParams', () => {
   });
 });
 
+describe('fix modes in the prompt', () => {
+  const user = (r: RemoteRequest) => buildParams(deps(new FakeMessages([])), r).messages[0].content as string;
+  const system = (r: RemoteRequest) => (buildParams(deps(new FakeMessages([])), r).system as Anthropic.TextBlockParam[]).map((b) => b.text);
+  const fix: RemoteRequest = { ...req, mode: 'fix-minimal', instruction: '', error: 's(...).gian is not a function', errorAt: { line: 4, inSelection: true } };
+
+  it('every mode shares one cached system prompt, which holds all three modes’ rules', () => {
+    const shape = system(req);
+    expect(system(fix)).toEqual(shape);
+    expect(system({ ...fix, mode: 'fix-rewrite' })).toEqual(shape);
+    for (const heading of ['## Mode: shape', '## Mode: fix-minimal', '## Mode: fix-rewrite']) expect(shape[0]).toContain(heading);
+    expect(user(fix)).not.toContain('## Mode');
+  });
+
+  it('fix-minimal: the mode, the error and its line, and no instruction', () => {
+    const u = user(fix);
+    expect(u.startsWith('Mode: fix-minimal\n')).toBe(true);
+    expect(u).toContain('Problem in the marked code: s(...).gian is not a function (buffer line 4)');
+    expect(u).not.toContain('Instruction');
+  });
+
+  it('a multi-line selection gets its line within the selection', () => {
+    const sel = '  s("bd*4"),\n  s("hh*8").gain(0.6)';
+    const from = BUFFER.indexOf(sel);
+    const u = user({ ...fix, selection: { from, to: from + sel.length, text: sel } });
+    expect(u).toContain('(buffer line 4, line 2 of the marked code)');
+  });
+
+  it('fix-rewrite: the instruction, or an ask to infer the intent', () => {
+    expect(user({ ...fix, mode: 'fix-rewrite', instruction: 'follow the chords' })).toContain('Instruction: follow the chords');
+    expect(user({ ...fix, mode: 'fix-rewrite' })).toContain('Instruction: none. Infer what the sketch is reaching for.');
+    expect(user({ ...fix, mode: 'fix-rewrite', error: undefined, errorAt: undefined })).toContain('The marked code runs.');
+  });
+
+  it('an error outside the selection, and another error elsewhere, are named as not to be fixed', () => {
+    expect(user({ ...fix, mode: 'fix-rewrite', errorAt: { line: 3, inSelection: false } })).toContain('The buffer fails outside the marked code, with: s(...).gian is not a function (buffer line 3).');
+    const u = user({ ...fix, error: 'Invalid argument', errorAt: { inSelection: true, otherError: { message: 's(...).gian is not a function', line: 3 } } });
+    expect(u).toContain('Problem in the marked code: Invalid argument\n');
+    expect(u).toContain('The buffer also fails elsewhere, outside the marked code: s(...).gian is not a function (buffer line 3). Leave that alone');
+  });
+
+  it('fix-minimal keeps at most 2 options; fix-rewrite 4; parallel is shape-only', async () => {
+    const minimal = await collect(streamClaudeOptions(deps(new FakeMessages([textEvents(payload(4))])), fix, new AbortController().signal));
+    expect(minimal.filter((l) => l.type === 'option')).toHaveLength(2);
+    const rewrite = await collect(streamClaudeOptions(deps(new FakeMessages([textEvents(payload(4))])), { ...fix, mode: 'fix-rewrite' }, new AbortController().signal));
+    expect(rewrite.filter((l) => l.type === 'option')).toHaveLength(4);
+    const calls = new FakeMessages([textEvents(payload(4))]);
+    await collect(streamClaudeOptions(deps(calls), { ...fix, mode: 'fix-rewrite', strategy: 'parallel' }, new AbortController().signal));
+    expect(calls.calls).toHaveLength(1);
+  });
+});
+
 describe('streamClaudeOptions', () => {
   it('emits each option as it closes, then done with usage and cost', async () => {
     const lines = await collect(streamClaudeOptions(deps(new FakeMessages([textEvents(payload(4))])), req, new AbortController().signal));

@@ -3,6 +3,8 @@ import type { RawOption } from '../jsonStream';
 export const SEL_OPEN = '/*<sel>*/';
 export const SEL_CLOSE = '/*</sel>*/';
 export const MAX_OPTIONS = 4;
+/** A minimal fix is one option, or two when the intent is genuinely ambiguous. */
+export const maxOptionsFor = (mode: string) => (mode === 'fix-minimal' ? 2 : MAX_OPTIONS);
 const MAX_LABEL_WORDS = 4;
 
 /**

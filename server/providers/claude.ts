@@ -4,7 +4,7 @@ import { mapError } from '../errors';
 import { OptionStreamParser } from '../jsonStream';
 import { DIRECTIONS, optionSchema, soundsSystem, staticSystem, userMessage, type UserMessageOptions } from '../prompt';
 import { MODELS, costUsd, type ModelInfo } from './models';
-import { MAX_OPTIONS, cleanOption } from './postprocess';
+import { MAX_OPTIONS, cleanOption, maxOptionsFor } from './postprocess';
 
 /** The one SDK call we use, so tests can pass a fake that replays scripted stream events. */
 export interface MessagesClient {
@@ -70,11 +70,12 @@ export async function* streamClaudeOptions(deps: ClaudeDeps, req: RemoteRequest,
     return;
   }
   const single = !!req.feedback;
-  if (req.strategy === 'parallel' && !single) {
+  // The parallel direction hints are about shaping; fix modes are always one call.
+  if (req.strategy === 'parallel' && !single && req.mode === 'shape') {
     yield* parallel(deps, req, info, signal);
     return;
   }
-  yield* oneCall(deps, req, info, signal, { single }, single ? 1 : MAX_OPTIONS);
+  yield* oneCall(deps, req, info, signal, { single }, single ? 1 : maxOptionsFor(req.mode));
 }
 
 async function* oneCall(
