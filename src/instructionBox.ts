@@ -41,7 +41,13 @@ export class InstructionBox {
     view.dispatch({ effects: StateEffect.appendConfig.of(field) });
 
     this.input.addEventListener('keydown', (e) => this.keydown(e));
-    this.input.addEventListener('blur', () => this.close());
+    // A doc change re-creates the tooltip, detaching the input mid-update (blur fires synchronously,
+    // and dispatching then throws). Check after the update, once mount() has refocused it.
+    this.input.addEventListener('blur', () =>
+      queueMicrotask(() => {
+        if (document.activeElement !== this.input) this.close();
+      }),
+    );
   }
 
   get isOpen() {
