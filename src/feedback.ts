@@ -29,6 +29,7 @@ export function asksForSilence(instruction: string): boolean {
 /** Plain-words names for the status line and cards. `eval` errors that are unknown functions get their own. */
 export function reasonLabel(reason: RetryReason, message = ''): string {
   if (reason === 'eval' && /is not (a function|defined)/.test(message)) return 'unknown function';
+  if (reason === 'identical' && /sounds exactly/.test(message)) return 'sounds the same';
   return {
     syntax: 'syntax',
     eval: 'eval error',
@@ -49,6 +50,8 @@ export interface FeedbackContext {
   unknownSounds?: string[];
   /** A few loaded sound names to suggest, e.g. "bd sd hh oh cp". */
   soundHint?: string;
+  /** For `identical`: the text differs but the events are exactly the original's. */
+  sameSound?: boolean;
 }
 
 /**
@@ -59,6 +62,7 @@ export function feedbackFor(reason: RetryReason, ctx: FeedbackContext = {}): str
   const msg = (ctx.message ?? '').replace(/\s+/g, ' ').trim();
   switch (reason) {
     case 'identical':
+      if (ctx.sameSound) return 'This option sounds exactly like the original. Change the sound.';
       return 'This option is the same as the original selection. Suggest a different variation.';
     case 'duplicate':
       return `This option is the same as option ${ctx.twinSlot ?? 'another'}. Suggest a different variation.`;

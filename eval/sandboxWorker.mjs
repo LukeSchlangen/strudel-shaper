@@ -13,5 +13,5 @@ parentPort.on('message', async (data) => {
     post({ type: 'ready', stubbed: sandbox.installStubs(data.stubs) });
     return;
   }
-  post({ type: 'result', id: data.id, result: await sandbox.check(data.code, data.cps, data.span) });
+  post({ type: 'result', id: data.id, result: await sandbox.check(data.code, data.cps, data.span, data.opts) });
 });

@@ -1,5 +1,5 @@
 import type { Option } from './provider';
-import type { CheckResult, CheckStage, Span, StubNames } from './sandbox';
+import type { CheckOptions, CheckResult, CheckStage, Span, StubNames } from './sandbox';
 import { splice, type Range } from './splice';
 
 /** One option's eval + query must finish within this, or it's dropped. */
@@ -10,7 +10,7 @@ export type DropReason = 'syntax' | 'eval' | 'query' | 'identical' | 'duplicate'
 export type Warning = 'unknown-sample' | 'empty';
 
 /** The unmodified buffer's own check, once per request. */
-export type Baseline = { ok: true } | { ok: false; stage: CheckStage; message: string };
+export type Baseline = { ok: true; fingerprint?: string } | { ok: false; stage: CheckStage; message: string };
 
 export interface ValidationResult {
   ok: boolean; // false = drop
@@ -23,12 +23,19 @@ export interface ValidationResult {
   eventScope?: 'option' | 'buffer';
   /** The spliced buffer failed with the buffer's own error, so the option was checked on its own. */
   checkedAlone?: boolean;
+  /** For `identical`: the same text, or different text that plays exactly the same events. */
+  identicalBy?: 'text' | 'sound';
   ms: number;
+}
+
+export interface ValidateContext {
+  /** The unmodified buffer's own check for this request. */
+  baseline?: Baseline;
 }
 
 /** Where the spliced buffer is actually evaluated: a worker in the browser, a Sandbox in tests. */
 export interface ValidationBackend {
-  check(code: string, cps: number, span?: Span): Promise<CheckResult>;
+  check(code: string, cps: number, span?: Span, opts?: CheckOptions): Promise<CheckResult>;
 }
 
 export interface ValidatorDeps {
@@ -43,8 +50,8 @@ export class Validator {
 
   /** Checks the unmodified buffer, so options aren't blamed for an error that is already there. */
   async baseline(buffer: string): Promise<Baseline> {
-    const r = await this.deps.backend.check(buffer, this.deps.cps());
-    return r.ok ? { ok: true } : { ok: false, stage: r.stage, message: r.message };
+    const r = await this.deps.backend.check(buffer, this.deps.cps(), undefined, { fingerprint: true });
+    return r.ok ? { ok: true, ...(r.fingerprint ? { fingerprint: r.fingerprint } : {}) } : { ok: false, stage: r.stage, message: r.message };
   }
 
   /** The raw check of `code`, with the events of `span` told apart: what ⌘J uses to find what to fix. */
@@ -61,26 +68,30 @@ export class Validator {
    * Checks `option` spliced into `buffer` at `range`. `others` are the options already accepted for
    * this request. With a failing `baseline`, an option that fails the same way is checked on its own
    * (the buffer's tempo lines + the option): kept if that passes, dropped as `buffer` if it fails the
-   * same way again.
+   * same way again. With a passing baseline, an option whose buffer plays exactly the same events
+   * as the original buffer (over FINGERPRINT_CYCLES cycles) is dropped as `identical` too.
    */
-  async validate(buffer: string, range: Range, option: Option, others: Option[], baseline?: Baseline): Promise<ValidationResult> {
-    const drop = (reason: DropReason, message: string, ms = 0): ValidationResult => ({
+  async validate(buffer: string, range: Range, option: Option, others: Option[], ctx: ValidateContext = {}): Promise<ValidationResult> {
+    const { baseline } = ctx;
+    const drop = (reason: DropReason, message: string, ms = 0, extra: Partial<ValidationResult> = {}): ValidationResult => ({
       ok: false,
       reason,
       message,
       warnings: [],
       eventCount: 0,
       ms,
+      ...extra,
     });
     const code = normalizeCode(option.code);
     if (code === normalizeCode(buffer.slice(range.from, range.to))) {
-      return drop('identical', 'The option is the same as the original selection.');
+      return drop('identical', 'The option is the same as the original selection.', 0, { identicalBy: 'text' });
     }
     const twin = others.find((o) => normalizeCode(o.code) === code);
     if (twin) return drop('duplicate', `The option is the same as the earlier option "${twin.label}".`);
 
     const span = { from: range.from, to: range.from + option.code.length };
-    let result = await this.deps.backend.check(splice(buffer, range, option.code), this.deps.cps(), span);
+    const original = baseline?.ok ? baseline.fingerprint : undefined;
+    let result = await this.deps.backend.check(splice(buffer, range, option.code), this.deps.cps(), span, original ? { fingerprint: true } : {});
     let checkedAlone = false;
     if (!result.ok && baseline && !baseline.ok && sameError(result, baseline)) {
       const tempo = tempoLines(buffer);
@@ -94,6 +105,9 @@ export class Validator {
     // A backend that can't pre-empt (in-process) still reports how long it took.
     if (result.ms > VALIDATION_TIMEOUT_MS) {
       return drop('timeout', `Took ${Math.round(result.ms)} ms (limit ${VALIDATION_TIMEOUT_MS} ms).`, result.ms);
+    }
+    if (original && !checkedAlone && result.fingerprint === original) {
+      return drop('identical', 'The option sounds exactly like the original.', result.ms, { identicalBy: 'sound' });
     }
     // Judge the option by its own events when its mini-notation lets us tell them apart: silencing
     // one line of a stack still leaves the others sounding, but that option is empty.
@@ -175,7 +189,7 @@ export function normalizeCode(code: string): string {
 
 export type WorkerRequest =
   | { type: 'init'; stubs: StubNames }
-  | { type: 'check'; id: number; code: string; cps: number; span?: Span };
+  | { type: 'check'; id: number; code: string; cps: number; span?: Span; opts?: CheckOptions };
 
 export type WorkerResponse = { type: 'ready'; stubbed?: StubNames } | { type: 'result'; id: number; result: CheckResult };
 
@@ -191,6 +205,7 @@ interface Job {
   code: string;
   cps: number;
   span?: Span;
+  opts?: CheckOptions;
   resolve: (r: CheckResult) => void;
 }
 
@@ -225,9 +240,9 @@ export class WorkerBackend implements ValidationBackend {
     this.worker.postMessage({ type: 'init', stubs });
   }
 
-  check(code: string, cps: number, span?: Span): Promise<CheckResult> {
+  check(code: string, cps: number, span?: Span, opts?: CheckOptions): Promise<CheckResult> {
     return new Promise((resolve) => {
-      this.queue.push({ id: this.nextId++, code, cps, span, resolve });
+      this.queue.push({ id: this.nextId++, code, cps, span, opts, resolve });
       this.pump();
     });
   }
@@ -270,7 +285,7 @@ export class WorkerBackend implements ValidationBackend {
     const job = this.queue.shift();
     if (!job) return;
     this.current = job;
-    this.worker.postMessage({ type: 'check', id: job.id, code: job.code, cps: job.cps, span: job.span });
+    this.worker.postMessage({ type: 'check', id: job.id, code: job.code, cps: job.cps, span: job.span, opts: job.opts });
     this.timer = setTimeout(() => {
       this.worker.terminate();
       this.respawns++;

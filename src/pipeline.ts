@@ -82,7 +82,7 @@ export async function runRequest(
   const validate = (option: Option, slot: OptionSlot): Promise<ValidationResult | null> => {
     const job = queue.then(async () => {
       if (signal.aborted) return null;
-      const result = await validator.validate(deps.getBuffer(), deps.getRange(), option, accepted.map((a) => a.option), baseline);
+      const result = await validator.validate(deps.getBuffer(), deps.getRange(), option, accepted.map((a) => a.option), { baseline });
       if (result.ok) accepted.push({ slot, option });
       return result;
     });
@@ -106,6 +106,7 @@ export async function runRequest(
       twinSlot: reason === 'duplicate' ? accepted.find((a) => normalizeCode(a.option.code) === code)?.slot : undefined,
       unknownSounds: result.unknownSounds,
       soundHint: deps.soundHint?.(),
+      sameSound: result.identicalBy === 'sound',
     });
   };
 

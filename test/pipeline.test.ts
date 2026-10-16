@@ -226,29 +226,34 @@ describe('runRequest with the faulty mock and the real sandbox', () => {
     const provider = new MockProvider({ seed: 3, minDelayMs: 0, maxDelayMs: 0, faultRate: 0.5, retryFails });
     const ready: Array<{ code: string; range: Range }> = [];
     const outcomes: string[] = [];
+    const sameSound: string[] = [];
     for (let i = 0; i < 30; i++) {
       const text = lines[i % 3];
       const from = STARTER_CODE.indexOf(text);
       const range = { from, to: from + text.length };
       const r: OptionRequest = { ...req, buffer: STARTER_CODE, selection: { ...range, text } };
+      const lastArrived = new Map<number, string>();
       const deps: PipelineDeps = {
         provider,
         validator,
         getBuffer: () => STARTER_CODE,
         getRange: () => range,
         emit: (e) => {
+          if (e.type === 'optionArrived') lastArrived.set(e.slot, e.option.code);
           if (e.type === 'optionValidated') ready.push({ code: e.option.code, range });
-          if (e.type === 'optionValidated' || e.type === 'optionDropped') outcomes.push(e.type);
+          if (e.type === 'optionValidated') outcomes.push(e.type);
+          if (e.type === 'optionDropped') outcomes.push(e.message.includes('sounds exactly') ? 'optionDropped (sounds the same)' : `optionDropped (${e.reason}: ${e.message})`);
+          if (e.type === 'optionRetrying' && e.message.includes('sounds exactly')) sameSound.push(lastArrived.get(e.slot) ?? '');
           if (e.type === 'optionRetrying') outcomes.push(['empty', 'unknown-sample'].includes(e.reason) ? 'optionRetrying (silent)' : e.type);
         },
       };
       await runRequest(deps, i, r, 4, new AbortController().signal);
     }
-    return { sandbox, provider, ready, outcomes };
+    return { sandbox, provider, ready, outcomes, sameSound };
   }
 
   it('no option that fails to evaluate is ever validated; every fault kind shows up', async () => {
-    const { sandbox, provider, ready, outcomes } = await soak(false);
+    const { sandbox, provider, ready, outcomes, sameSound } = await soak(false);
     for (const { code, range } of ready) {
       expect(await sandbox.check(splice(STARTER_CODE, range, code), 0.5)).toMatchObject({ ok: true });
     }
@@ -256,13 +261,17 @@ describe('runRequest with the faulty mock and the real sandbox', () => {
     expect(ready.some((r) => hard.has(r.code))).toBe(false);
     expect(new Set(provider.faultLog.map((f) => f.kind)).size).toBe(7);
     expect(outcomes).toContain('optionRetrying');
-    // Replacements are valid by default, so nothing is dropped for good.
-    expect(outcomes).not.toContain('optionDropped');
+    // Replacements are valid by default. What is dropped for good: the mock's `.rev()` on a uniform
+    // line (`bd*4`, `hh*8`) plays exactly the original, so the sounds-identical check retries it, and
+    // its replacement can run out of the mock's 7 transforms (a duplicate; see NOTES.md, milestone 3).
+    expect(sameSound.length).toBeGreaterThan(0);
+    expect(sameSound.every((code) => /\.rev\(\),?$/.test(code))).toBe(true);
+    for (const o of outcomes.filter((o) => o.startsWith('optionDropped'))) expect(o).toMatch(/sounds the same|duplicate/);
   });
 
   it('with retryFails, failed slots are dropped for good; silent ones keep their original', async () => {
     const { outcomes } = await soak(true);
-    expect(outcomes.filter((o) => o === 'optionDropped').length).toBe(outcomes.filter((o) => o === 'optionRetrying').length);
+    expect(outcomes.filter((o) => o.startsWith('optionDropped')).length).toBe(outcomes.filter((o) => o === 'optionRetrying').length);
     expect(outcomes).toContain('optionRetrying (silent)');
   });
 });

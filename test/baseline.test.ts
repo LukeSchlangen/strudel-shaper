@@ -32,7 +32,7 @@ beforeAll(async () => {
 
 describe('Validator.baseline and checking alone', () => {
   it('a healthy buffer passes its baseline', async () => {
-    expect(await validator.baseline(GOOD)).toEqual({ ok: true });
+    expect(await validator.baseline(GOOD)).toMatchObject({ ok: true, fingerprint: expect.any(String) });
   });
 
   it.each([
@@ -41,7 +41,7 @@ describe('Validator.baseline and checking alone', () => {
   ])('with a broken line elsewhere (%s), a healthy option is checked alone and kept', async (stage, buffer) => {
     const baseline = await validator.baseline(buffer);
     expect(baseline).toMatchObject({ ok: false, stage });
-    const r = await validator.validate(buffer, range(buffer), opt('s("hh*16").gain(0.5)'), [], baseline);
+    const r = await validator.validate(buffer, range(buffer), opt('s("hh*16").gain(0.5)'), [], { baseline });
     expect(r).toMatchObject({ ok: true, checkedAlone: true, eventScope: 'option', eventCount: 32 });
   });
 
@@ -52,14 +52,14 @@ describe('Validator.baseline and checking alone', () => {
 
   it('an option that is broken in its own way is still dropped for its own error', async () => {
     const baseline = await validator.baseline(BROKEN_SYNTAX);
-    const r = await validator.validate(BROKEN_SYNTAX, range(BROKEN_SYNTAX), opt('s("hh*16").zork(1)'), [], baseline);
+    const r = await validator.validate(BROKEN_SYNTAX, range(BROKEN_SYNTAX), opt('s("hh*16").zork(1)'), [], { baseline });
     expect(r).toMatchObject({ ok: false, reason: 'eval' });
     expect(r.message).toMatch(/zork/);
   });
 
   it('an option that fails alone with the buffer’s own error is dropped as `buffer`', async () => {
     const baseline = await validator.baseline(BROKEN_EVAL);
-    const r = await validator.validate(BROKEN_EVAL, range(BROKEN_EVAL), opt('s("hh*16").wobble(2)'), [], baseline);
+    const r = await validator.validate(BROKEN_EVAL, range(BROKEN_EVAL), opt('s("hh*16").wobble(2)'), [], { baseline });
     expect(r).toMatchObject({ ok: false, reason: 'buffer' });
   });
 
@@ -68,7 +68,7 @@ describe('Validator.baseline and checking alone', () => {
     const sel = 's("hh*8").gain(0.6).wobble(1)';
     const from = buffer.indexOf(sel);
     const baseline = await validator.baseline(buffer);
-    const r = await validator.validate(buffer, { from, to: from + sel.length }, opt('s("hh*8").gain(0.4)'), [], baseline);
+    const r = await validator.validate(buffer, { from, to: from + sel.length }, opt('s("hh*8").gain(0.4)'), [], { baseline });
     expect(r).toMatchObject({ ok: true });
     expect(r.checkedAlone).toBeUndefined();
   });
