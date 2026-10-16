@@ -38,6 +38,7 @@ export function reasonLabel(reason: RetryReason, message = ''): string {
     identical: 'identical',
     duplicate: 'duplicate',
     buffer: 'buffer error',
+    unfixed: 'still broken',
     empty: 'no sound',
     'unknown-sample': 'unknown sample',
   }[reason];
@@ -80,6 +81,8 @@ export function feedbackFor(reason: RetryReason, ctx: FeedbackContext = {}): str
       return `This code evaluates but fails while playing (${msg}). Return code that plays, without reading event values that may not exist.`;
     case 'timeout':
       return 'This code takes too long to compute. Return something lighter: no huge fast() factors or deep nesting.';
+    case 'unfixed':
+      return `This still fails with: ${msg}. Return code that fixes this error.`;
     case 'buffer':
       return 'The buffer around the selection fails on its own. Return an option that works by itself.';
     case 'empty':

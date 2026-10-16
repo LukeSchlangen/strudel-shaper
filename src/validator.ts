@@ -1,3 +1,5 @@
+import { changeSize } from './diff';
+import { locateError } from './errorPosition';
 import type { Option } from './provider';
 import type { CheckOptions, CheckResult, CheckStage, Span, StubNames } from './sandbox';
 import { splice, type Range } from './splice';
@@ -5,8 +7,11 @@ import { splice, type Range } from './splice';
 /** One option's eval + query must finish within this, or it's dropped. */
 export const VALIDATION_TIMEOUT_MS = 250;
 
-/** `buffer`: the option fails only because the unmodified buffer fails the same way, and it fails alone too. */
-export type DropReason = 'syntax' | 'eval' | 'query' | 'identical' | 'duplicate' | 'timeout' | 'buffer';
+/**
+ * `buffer`: the option fails only because the unmodified buffer fails the same way, and it fails alone too.
+ * `unfixed` (fix modes): the option still fails with the error it was asked to fix.
+ */
+export type DropReason = 'syntax' | 'eval' | 'query' | 'identical' | 'duplicate' | 'timeout' | 'buffer' | 'unfixed';
 export type Warning = 'unknown-sample' | 'empty';
 
 /** The unmodified buffer's own check, once per request. */
@@ -25,12 +30,24 @@ export interface ValidationResult {
   checkedAlone?: boolean;
   /** For `identical`: the same text, or different text that plays exactly the same events. */
   identicalBy?: 'text' | 'sound';
+  /** Fix modes: characters inserted plus deleted, against the selection. */
+  changeSize?: number;
   ms: number;
 }
 
+/** What a fix-mode request is fixing. */
+export interface FixContext {
+  /** The error being fixed (for a silent selection: stage `silent`, which no check result matches). */
+  originalError: { stage: string; message: string };
+  /** The buffer also fails outside the selection: judge each option on its own (tempo lines + option). */
+  judgeAlone?: boolean;
+}
+
 export interface ValidateContext {
-  /** The unmodified buffer's own check for this request. */
+  /** The unmodified buffer's own check for this request (shape mode). */
   baseline?: Baseline;
+  /** Fix modes. The original is broken by definition, so the baseline rules don't apply. */
+  fix?: FixContext;
 }
 
 /** Where the spliced buffer is actually evaluated: a worker in the browser, a Sandbox in tests. */
@@ -72,7 +89,7 @@ export class Validator {
    * as the original buffer (over FINGERPRINT_CYCLES cycles) is dropped as `identical` too.
    */
   async validate(buffer: string, range: Range, option: Option, others: Option[], ctx: ValidateContext = {}): Promise<ValidationResult> {
-    const { baseline } = ctx;
+    const { baseline, fix } = ctx;
     const drop = (reason: DropReason, message: string, ms = 0, extra: Partial<ValidationResult> = {}): ValidationResult => ({
       ok: false,
       reason,
@@ -90,14 +107,19 @@ export class Validator {
     if (twin) return drop('duplicate', `The option is the same as the earlier option "${twin.label}".`);
 
     const span = { from: range.from, to: range.from + option.code.length };
+    const tempo = tempoLines(buffer);
+    const checkAlone = () => {
+      const alone = tempo + option.code;
+      return this.deps.backend.check(alone, this.deps.cps(), { from: tempo.length, to: alone.length });
+    };
+    if (fix) return this.validateFix(buffer, range, option, fix, span, checkAlone);
+
     const original = baseline?.ok ? baseline.fingerprint : undefined;
     let result = await this.deps.backend.check(splice(buffer, range, option.code), this.deps.cps(), span, original ? { fingerprint: true } : {});
     let checkedAlone = false;
     if (!result.ok && baseline && !baseline.ok && sameError(result, baseline)) {
-      const tempo = tempoLines(buffer);
-      const alone = tempo + option.code;
       const spliced = result;
-      result = await this.deps.backend.check(alone, this.deps.cps(), { from: tempo.length, to: alone.length });
+      result = await checkAlone();
       if (!result.ok && sameError(result, baseline)) return drop('buffer', baseline.message, spliced.ms + result.ms);
       checkedAlone = true;
     }
@@ -109,8 +131,54 @@ export class Validator {
     if (original && !checkedAlone && result.fingerprint === original) {
       return drop('identical', 'The option sounds exactly like the original.', result.ms, { identicalBy: 'sound' });
     }
-    // Judge the option by its own events when its mini-notation lets us tell them apart: silencing
-    // one line of a stack still leaves the others sounding, but that option is empty.
+    return this.passed(result, checkedAlone);
+  }
+
+  /**
+   * Fix modes. The fix test: the option spliced into the whole buffer transpiles, evaluates and
+   * queries, and makes sound. With errors elsewhere in the buffer (`judgeAlone`, or a new failure
+   * located outside the option), the option is judged on its own instead, with the `checked alone`
+   * badge. Still failing with the original error is `unfixed`, which is retried once.
+   */
+  private async validateFix(
+    buffer: string,
+    range: Range,
+    option: Option,
+    fix: FixContext,
+    span: Span,
+    checkAlone: () => Promise<CheckResult>,
+  ): Promise<ValidationResult> {
+    const size = changeSize(buffer.slice(range.from, range.to), option.code);
+    let result: CheckResult;
+    let checkedAlone = false;
+    let ms = 0;
+    if (fix.judgeAlone) {
+      result = await checkAlone();
+      checkedAlone = true;
+    } else {
+      const spliced = splice(buffer, range, option.code);
+      result = await this.deps.backend.check(spliced, this.deps.cps(), span);
+      if (!result.ok && !sameError(result, fix.originalError)) {
+        const at = locateError(spliced, result.message).pos;
+        if (at !== undefined && (at < span.from || at > span.to)) {
+          ms = result.ms;
+          result = await checkAlone();
+          checkedAlone = true;
+        }
+      }
+    }
+    ms += result.ms;
+    const fail = (reason: DropReason, message: string): ValidationResult => ({ ok: false, reason, message, warnings: [], eventCount: 0, changeSize: size, ms });
+    if (!result.ok) return fail(sameError(result, fix.originalError) ? 'unfixed' : result.stage, result.message);
+    if (result.ms > VALIDATION_TIMEOUT_MS) return fail('timeout', `Took ${Math.round(result.ms)} ms (limit ${VALIDATION_TIMEOUT_MS} ms).`);
+    return { ...this.passed(result, checkedAlone), changeSize: size, ms };
+  }
+
+  /**
+   * A result that passed. Judge the option by its own events when its mini-notation lets us tell
+   * them apart: silencing one line of a stack still leaves the others sounding, but that option is empty.
+   */
+  private passed(result: Extract<CheckResult, { ok: true }>, checkedAlone: boolean): ValidationResult {
     const own = result.span ?? result;
     const warnings: Warning[] = [];
     const unknownSounds = own.sounds.filter((s) => !this.deps.hasSound(s));

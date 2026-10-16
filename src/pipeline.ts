@@ -2,7 +2,7 @@ import { asksForSilence, feedbackFor, type RetryReason } from './feedback';
 import type { Option, OptionRequest, Provider, ProviderStats } from './provider';
 import type { Range } from './splice';
 import type { OptionSlot, TrayEvent } from './trayMachine';
-import { normalizeCode, type Baseline, type ValidationResult, type Validator } from './validator';
+import { normalizeCode, type Baseline, type FixContext, type ValidationResult, type Validator } from './validator';
 
 export { reasonLabel } from './feedback';
 
@@ -60,6 +60,8 @@ export async function runRequest(
   req: OptionRequest,
   slotCount: number,
   signal: AbortSignal,
+  /** Fix modes: what is being fixed. The original is broken, so there is no baseline. */
+  fix?: FixContext,
 ): Promise<void> {
   const { provider, validator, emit } = deps;
   const accepted: Array<{ slot: OptionSlot; option: Option }> = [];
@@ -70,7 +72,7 @@ export async function runRequest(
   // One validation at a time, in arrival order: "duplicate" means the same as one accepted before it.
   // The baseline goes first, so every option is judged against it.
   let baseline: Baseline | undefined;
-  let queue: Promise<unknown> = validator.baseline
+  let queue: Promise<unknown> = validator.baseline && !fix
     ? validator
         .baseline(deps.getBuffer())
         .then((b) => {
@@ -82,7 +84,7 @@ export async function runRequest(
   const validate = (option: Option, slot: OptionSlot): Promise<ValidationResult | null> => {
     const job = queue.then(async () => {
       if (signal.aborted) return null;
-      const result = await validator.validate(deps.getBuffer(), deps.getRange(), option, accepted.map((a) => a.option), { baseline });
+      const result = await validator.validate(deps.getBuffer(), deps.getRange(), option, accepted.map((a) => a.option), { baseline, fix });
       if (result.ok) accepted.push({ slot, option });
       return result;
     });
@@ -136,6 +138,7 @@ export async function runRequest(
       warnings: result.warnings,
       unknownSounds: result.unknownSounds,
       checkedAlone: result.checkedAlone,
+      changeSize: result.changeSize,
       ms: result.ms,
     });
 

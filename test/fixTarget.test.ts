@@ -2,7 +2,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { EditorState } from '@codemirror/state';
 import { javascript } from '@codemirror/lang-javascript';
 import { ensureSyntaxTree } from '@codemirror/language';
-import { codeOccurrences, diagnoseFix, locateError, type Diagnosis } from '../src/fixTarget';
+import { codeOccurrences, locateError } from '../src/errorPosition';
+import { diagnoseFix, type Diagnosis } from '../src/fixTarget';
 import { STARTER_CODE } from '../src/options';
 import { Sandbox } from '../src/sandbox';
 import { Validator } from '../src/validator';
@@ -54,6 +55,8 @@ describe('Strudel error messages (what positions they carry)', () => {
     const doc = broken('s(hh*8).gain(0.6)');
     expect(locateError(doc, 'hh is not defined')).toEqual({ pos: doc.indexOf('hh*8)'), line: 4 });
     expect(locateError(doc, 'Invalid array length')).toEqual({});
+    const chained = broken('s("hh*8").gain(0.6).zork(1)');
+    expect(locateError(chained, 's(...).gain(...).zork is not a function')).toEqual({ pos: chained.indexOf('zork'), line: 4 });
     expect(locateError(STARTER_CODE, 's is not a function')).toEqual({}); // `s` occurs three times: no guess
     expect(codeOccurrences('s("hh").hh(1) // hh\n/* hh */ hhh', 'hh')).toEqual([8]);
   });

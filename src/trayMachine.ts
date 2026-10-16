@@ -24,6 +24,8 @@ export interface SlotCard {
   unknownSounds?: string[];
   /** Passed only when checked on its own, because the buffer itself fails. */
   checkedAlone?: boolean;
+  /** Fix modes: characters changed against the selection. */
+  changeSize?: number;
   /** A replacement was asked for. */
   retried?: boolean;
   /** Why the slot was (last) dropped or retried. */
@@ -70,6 +72,7 @@ export type TrayEvent =
       warnings: Warning[];
       unknownSounds?: string[];
       checkedAlone?: boolean;
+      changeSize?: number;
       ms: number;
     }
   | { type: 'optionRetrying'; requestId: number; slot: OptionSlot; reason: RetryReason; message: string; ms: number }
@@ -169,6 +172,7 @@ function trayTransition(state: Tray, event: TrayEvent): Transition {
             warnings: event.warnings,
             unknownSounds: event.unknownSounds,
             checkedAlone: event.checkedAlone,
+            changeSize: event.changeSize,
             retried: card.retried,
             drop: card.drop,
           };
