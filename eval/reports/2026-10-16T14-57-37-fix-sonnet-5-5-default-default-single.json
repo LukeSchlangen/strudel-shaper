@@ -1,0 +1,1066 @@
+{
+ "label": "fix-sonnet-5-5-default-default-single",
+ "createdAt": "2026-10-16T14:57:37.291Z",
+ "config": {
+  "provider": "claude",
+  "model": "claude-sonnet-5-5",
+  "mode": "fix",
+  "warmup": false
+ },
+ "soundsTokens": 1053,
+ "referenceTokens": 2438,
+ "results": [
+  {
+   "id": "fix-misspelled",
+   "bufferId": "starter-gian",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*4\"),\n  s(\"hh*8\").gian(0.6),\n  note(\"c2 [~ c2] eb2 g1\").s(\"sawtooth\").lpf(800)\n)",
+   "mode": "fix-minimal",
+   "selection": {
+    "from": 34,
+    "to": 53,
+    "text": "s(\"hh*8\").gian(0.6)"
+   },
+   "instruction": "",
+   "diagnosis": {
+    "kind": "broken",
+    "stage": "eval",
+    "message": "s(...).gian is not a function",
+    "line": 4,
+    "otherError": false
+   },
+   "originalBroken": true,
+   "firstArrivalMs": 1552.714,
+   "firstCardMs": 1569.030833,
+   "lastSettledMs": 1569.030833,
+   "totalMs": 1569.156667,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1342.299,
+    "lastMs": 1342.299,
+    "totalMs": 1352.646542,
+    "tokens": {
+     "input": 171,
+     "output": 41,
+     "cacheRead": 0,
+     "cacheWrite": 8231
+    },
+    "costUsd": 0.0213295
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "gain not gian",
+       "code": "s(\"hh*8\").gain(0.6)",
+       "arrivedMs": 1552.714
+      }
+     ],
+     "label": "gain not gian",
+     "code": "s(\"hh*8\").gain(0.6)",
+     "warnings": [],
+     "changeSize": 2,
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "fix-mini-bracket",
+   "bufferId": "starter-mini",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*4\"),\n  s(\"hh*8[\").gain(0.6),\n  note(\"c2 [~ c2] eb2 g1\").s(\"sawtooth\").lpf(800)\n)",
+   "mode": "fix-minimal",
+   "selection": {
+    "from": 34,
+    "to": 54,
+    "text": "s(\"hh*8[\").gain(0.6)"
+   },
+   "instruction": "",
+   "diagnosis": {
+    "kind": "broken",
+    "stage": "syntax",
+    "message": "[mini] parse error at line 4: Expected \"<\", \"[\", \"^\", \"{\", a letter, a number, \"-\", \"#\", \".\", \"^\", \"_\", or whitespace but \"\\\"\" found.",
+    "line": 4,
+    "otherError": false
+   },
+   "originalBroken": true,
+   "firstArrivalMs": 1152.1185830000002,
+   "firstCardMs": 1162.3424579999999,
+   "lastSettledMs": 1162.3424579999999,
+   "totalMs": 1162.427708,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1142.4565830000001,
+    "lastMs": 1142.4565830000001,
+    "totalMs": 1144.4787499999998,
+    "tokens": {
+     "input": 223,
+     "output": 43,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.0016990999999999998
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "remove stray bracket",
+       "code": "s(\"hh*8\").gain(0.6)",
+       "arrivedMs": 1152.1185830000002
+      }
+     ],
+     "label": "remove stray bracket",
+     "code": "s(\"hh*8\").gain(0.6)",
+     "warnings": [],
+     "changeSize": 1,
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "fix-missing-quote",
+   "bufferId": "starter-quote",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*4\"),\n  s(\"hh*8).gain(0.6),\n  note(\"c2 [~ c2] eb2 g1\").s(\"sawtooth\").lpf(800)\n)",
+   "mode": "fix-minimal",
+   "selection": {
+    "from": 34,
+    "to": 52,
+    "text": "s(\"hh*8).gain(0.6)"
+   },
+   "instruction": "",
+   "diagnosis": {
+    "kind": "broken",
+    "stage": "syntax",
+    "message": "Unterminated string constant (4:4)",
+    "line": 4,
+    "otherError": false
+   },
+   "originalBroken": true,
+   "firstArrivalMs": 1144.206209,
+   "firstCardMs": 1158.365542,
+   "lastSettledMs": 1158.365542,
+   "totalMs": 1178.4798340000002,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1132.9743749999998,
+    "lastMs": 1132.9743749999998,
+    "totalMs": 1165.816042,
+    "tokens": {
+     "input": 174,
+     "output": 40,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.0015711
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "close the quote",
+       "code": "s(\"hh*8\").gain(0.6)",
+       "arrivedMs": 1144.206209
+      }
+     ],
+     "label": "close the quote",
+     "code": "s(\"hh*8\").gain(0.6)",
+     "warnings": [],
+     "changeSize": 1,
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "fix-missing-paren",
+   "bufferId": "starter-paren",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*4\"),\n  s(\"hh*8\".gain(0.6),\n  note(\"c2 [~ c2] eb2 g1\").s(\"sawtooth\").lpf(800)\n)",
+   "mode": "fix-minimal",
+   "selection": {
+    "from": 34,
+    "to": 52,
+    "text": "s(\"hh*8\".gain(0.6)"
+   },
+   "instruction": "",
+   "diagnosis": {
+    "kind": "broken",
+    "stage": "syntax",
+    "message": "Unexpected token (6:1)",
+    "line": 4,
+    "otherError": false
+   },
+   "originalBroken": true,
+   "firstArrivalMs": 1608.5860830000001,
+   "firstCardMs": 1616.0033750000002,
+   "lastSettledMs": 1616.0033750000002,
+   "totalMs": 1641.8260410000003,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1598.4182500000006,
+    "lastMs": 1598.4182500000006,
+    "totalMs": 1631.4370420000005,
+    "tokens": {
+     "input": 172,
+     "output": 40,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.0015670999999999999
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "move bracket",
+       "code": "s(\"hh*8\").gain(0.6)",
+       "arrivedMs": 1608.5860830000001
+      }
+     ],
+     "label": "move bracket",
+     "code": "s(\"hh*8\").gain(0.6)",
+     "warnings": [],
+     "changeSize": 1,
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "fix-arg-type",
+   "bufferId": "starter-fast-type",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*4\"),\n  s(\"hh*8\").fast(\"double\").gain(0.6),\n  note(\"c2 [~ c2] eb2 g1\").s(\"sawtooth\").lpf(800)\n)",
+   "mode": "fix-minimal",
+   "selection": {
+    "from": 34,
+    "to": 68,
+    "text": "s(\"hh*8\").fast(\"double\").gain(0.6)"
+   },
+   "instruction": "",
+   "diagnosis": {
+    "kind": "broken",
+    "stage": "query",
+    "message": "Invalid argument",
+    "line": 4,
+    "otherError": false
+   },
+   "originalBroken": true,
+   "firstArrivalMs": 1880.8426250000002,
+   "firstCardMs": 1889.7766659999998,
+   "lastSettledMs": 1889.7766659999998,
+   "totalMs": 1890.266125,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1855.179666,
+    "lastMs": 1855.179666,
+    "totalMs": 1858.1752909999996,
+    "tokens": {
+     "input": 172,
+     "output": 45,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.0016171
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "double is 2",
+       "code": "s(\"hh*8\").fast(2).gain(0.6)",
+       "arrivedMs": 1880.8426250000002
+      }
+     ],
+     "label": "double is 2",
+     "code": "s(\"hh*8\").fast(2).gain(0.6)",
+     "warnings": [],
+     "changeSize": 9,
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "fix-arg-order",
+   "bufferId": "drums-euclid-order",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*4\"),\n  s(\"~ sd ~ sd\").bank(\"tr909\"),\n  s(\"hh\").euclid(8, 3).gain(0.5),\n  s(\"~ ~ ~ oh\").gain(0.4)\n)",
+   "mode": "fix-minimal",
+   "selection": {
+    "from": 66,
+    "to": 96,
+    "text": "s(\"hh\").euclid(8, 3).gain(0.5)"
+   },
+   "instruction": "",
+   "diagnosis": {
+    "kind": "broken",
+    "stage": "eval",
+    "message": "Invalid array length",
+    "line": 5,
+    "otherError": false
+   },
+   "originalBroken": true,
+   "firstArrivalMs": 1426.5913329999994,
+   "firstCardMs": 1434.6746249999987,
+   "lastSettledMs": 1434.6746249999987,
+   "totalMs": 1434.794832999999,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1415.116,
+    "lastMs": 1415.116,
+    "totalMs": 1417.202292,
+    "tokens": {
+     "input": 184,
+     "output": 49,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.0016810999999999998
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "swap euclid args",
+       "code": "s(\"hh\").euclid(3, 8).gain(0.5)",
+       "arrivedMs": 1426.5913329999994
+      }
+     ],
+     "label": "swap euclid args",
+     "code": "s(\"hh\").euclid(3, 8).gain(0.5)",
+     "warnings": [],
+     "changeSize": 4,
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "fix-signal-call",
+   "bufferId": "effects-sine-call",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*2 ~ bd, ~ cp\").room(0.2),\n  note(\"c3 eb3 g3 bb3\").s(\"supersaw\").lpf(sine.range(400, 3000).slow(8)).delay(0.4).delaytime(0.375).gain(0.4),\n  s(\"hh*16\").gain(\".6 .3\").pan(sine().fast(2))\n)",
+   "mode": "fix-minimal",
+   "selection": {
+    "from": 167,
+    "to": 211,
+    "text": "s(\"hh*16\").gain(\".6 .3\").pan(sine().fast(2))"
+   },
+   "instruction": "",
+   "diagnosis": {
+    "kind": "broken",
+    "stage": "eval",
+    "message": "sine is not a function",
+    "line": 5,
+    "otherError": false
+   },
+   "originalBroken": true,
+   "firstArrivalMs": 1631.451500000001,
+   "firstCardMs": 1644.147833000001,
+   "lastSettledMs": 1644.147833000001,
+   "totalMs": 1644.4532909999998,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1616.2226250000003,
+    "lastMs": 1616.2226250000003,
+    "totalMs": 1621.73625,
+    "tokens": {
+     "input": 231,
+     "output": 56,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.0018451
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "sine is a value",
+       "code": "s(\"hh*16\").gain(\".6 .3\").pan(sine.fast(2))",
+       "arrivedMs": 1631.451500000001
+      }
+     ],
+     "label": "sine is a value",
+     "code": "s(\"hh*16\").gain(\".6 .3\").pan(sine.fast(2))",
+     "warnings": [],
+     "changeSize": 2,
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "fix-silence-call",
+   "bufferId": "chords-silence-call",
+   "buffer": "setcps(0.45)\nstack(\n  chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano1\").room(0.3),\n  note(\"<c2 f2 bb1 eb2>\").s(\"triangle\").gain(0.8),\n  silence()\n)",
+   "mode": "fix-minimal",
+   "selection": {
+    "from": 142,
+    "to": 151,
+    "text": "silence()"
+   },
+   "instruction": "",
+   "diagnosis": {
+    "kind": "broken",
+    "stage": "eval",
+    "message": "silence is not a function",
+    "line": 5,
+    "otherError": false
+   },
+   "originalBroken": true,
+   "firstArrivalMs": 1254.7175829999996,
+   "firstCardMs": 1263.5052909999995,
+   "lastSettledMs": 1263.5052909999995,
+   "totalMs": 1281.4621660000012,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1246.770375,
+    "lastMs": 1246.770375,
+    "totalMs": 1273.2561669999996,
+    "tokens": {
+     "input": 194,
+     "output": 26,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.0014711
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "silence is a value",
+       "code": "silence",
+       "arrivedMs": 1254.7175829999996
+      }
+     ],
+     "label": "silence is a value",
+     "code": "silence",
+     "warnings": [],
+     "changeSize": 2,
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "fix-scale-name",
+   "bufferId": "melody-scale-typo",
+   "buffer": "setcps(0.5)\nstack(\n  n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorain\").s(\"square\").lpf(1800).gain(0.5),\n  note(\"d2 ~ a1 ~\").s(\"sawtooth\").lpf(500),\n  s(\"bd ~ sd ~, hh*8\")\n)",
+   "mode": "fix-minimal",
+   "selection": {
+    "from": 21,
+    "to": 95,
+    "text": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorain\").s(\"square\").lpf(1800).gain(0.5)"
+   },
+   "instruction": "",
+   "diagnosis": {
+    "kind": "broken",
+    "stage": "silent",
+    "message": "It runs but makes no sound.",
+    "otherError": false
+   },
+   "originalBroken": false,
+   "firstArrivalMs": 2105.04025,
+   "firstCardMs": 2116.5270419999997,
+   "lastSettledMs": 2116.5270419999997,
+   "totalMs": 2131.196249999999,
+   "stats": {
+    "calls": 1,
+    "firstMs": 2066.4599579999995,
+    "lastMs": 2066.4599579999995,
+    "totalMs": 2091.985375,
+    "tokens": {
+     "input": 204,
+     "output": 85,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.0020811
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "dorian not dorain",
+       "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+       "arrivedMs": 2105.04025
+      }
+     ],
+     "label": "dorian not dorain",
+     "code": "n(\"0 2 4 <5 7> 4 2 0 ~\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+     "warnings": [],
+     "changeSize": 2,
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "fix-silent-selection",
+   "bufferId": "bass-silent-hats",
+   "buffer": "setcps(0.55)\nstack(\n  s(\"bd*4, ~ cp\"),\n  note(\"<c2 c2 ab1 bb1>*4\").s(\"sawtooth\").lpf(600).lpq(6).decay(0.15).sustain(0),\n  s(0.4).gain(\"hh*8\")\n)",
+   "mode": "fix-minimal",
+   "selection": {
+    "from": 123,
+    "to": 142,
+    "text": "s(0.4).gain(\"hh*8\")"
+   },
+   "instruction": "",
+   "diagnosis": {
+    "kind": "broken",
+    "stage": "silent",
+    "message": "It runs but makes no sound.",
+    "otherError": false
+   },
+   "originalBroken": false,
+   "firstArrivalMs": 1555.4009999999998,
+   "firstCardMs": 1562.1994159999995,
+   "lastSettledMs": 1562.1994159999995,
+   "totalMs": 1564.5687500000004,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1538.0835000000006,
+    "lastMs": 1538.0835000000006,
+    "totalMs": 1546.9131249999991,
+    "tokens": {
+     "input": 189,
+     "output": 42,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.0016210999999999999
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "swap s and gain",
+       "code": "s(\"hh*8\").gain(0.4)",
+       "arrivedMs": 1555.4009999999998
+      }
+     ],
+     "label": "swap s and gain",
+     "code": "s(\"hh*8\").gain(0.4)",
+     "warnings": [],
+     "changeSize": 18,
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "fix-error-elsewhere",
+   "bufferId": "drums-two-errors",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*4\").gian(2),\n  s(\"~ sd ~ sd\").bank(\"tr909\"),\n  s(\"hh*8\").fast(\"double\").gain(0.5),\n  s(\"~ ~ ~ oh\").gain(0.4)\n)",
+   "mode": "fix-minimal",
+   "selection": {
+    "from": 74,
+    "to": 108,
+    "text": "s(\"hh*8\").fast(\"double\").gain(0.5)"
+   },
+   "instruction": "",
+   "diagnosis": {
+    "kind": "broken",
+    "stage": "query",
+    "message": "Invalid argument",
+    "otherError": true
+   },
+   "originalBroken": true,
+   "firstArrivalMs": 2113.939666,
+   "firstCardMs": 2118.8409999999985,
+   "lastSettledMs": 2118.8409999999985,
+   "totalMs": 2128.148457999998,
+   "stats": {
+    "calls": 1,
+    "firstMs": 2103.4249579999996,
+    "lastMs": 2103.4249579999996,
+    "totalMs": 2117.3512919999994,
+    "tokens": {
+     "input": 232,
+     "output": 45,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.0017370999999999999
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "double is 2",
+       "code": "s(\"hh*8\").fast(2).gain(0.5)",
+       "arrivedMs": 2113.939666
+      }
+     ],
+     "label": "double is 2",
+     "code": "s(\"hh*8\").fast(2).gain(0.5)",
+     "warnings": [],
+     "checkedAlone": true,
+     "changeSize": 9,
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "rewrite-bass-chords",
+   "bufferId": "chords-sketch-bass",
+   "buffer": "setcps(0.45)\nstack(\n  chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano1\").room(0.3),\n  note(\"<Cm7 Fm7 Bb7 Ebmaj7>\").s(\"triangle\").gain(0.8),\n  s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\")\n)",
+   "mode": "fix-rewrite",
+   "selection": {
+    "from": 91,
+    "to": 143,
+    "text": "note(\"<Cm7 Fm7 Bb7 Ebmaj7>\").s(\"triangle\").gain(0.8)"
+   },
+   "instruction": "the bass should follow the chords",
+   "diagnosis": {
+    "kind": "ok",
+    "otherError": false
+   },
+   "originalBroken": false,
+   "firstArrivalMs": 1483.7353330000005,
+   "firstCardMs": 1490.2543750000004,
+   "lastSettledMs": 3087.1977499999994,
+   "totalMs": 3087.284458000002,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1458.7412079999995,
+    "lastMs": 3048.0374999999985,
+    "totalMs": 3056.831624999999,
+    "tokens": {
+     "input": 240,
+     "output": 341,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.0047131000000000004
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "root notes whole",
+       "code": "\"<Cm7 Fm7 Bb7 Ebmaj7>\".rootNotes(2).note().s(\"triangle\").gain(0.8)",
+       "arrivedMs": 1483.7353330000005
+      }
+     ],
+     "label": "root notes whole",
+     "code": "\"<Cm7 Fm7 Bb7 Ebmaj7>\".rootNotes(2).note().s(\"triangle\").gain(0.8)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "root and fifth",
+       "code": "\"<Cm7 Fm7 Bb7 Ebmaj7>\".rootNotes(2).note().add(note(\"0 7\")).s(\"triangle\").gain(0.8)",
+       "arrivedMs": 1909.5502080000006
+      }
+     ],
+     "label": "root and fifth",
+     "code": "\"<Cm7 Fm7 Bb7 Ebmaj7>\".rootNotes(2).note().add(note(\"0 7\")).s(\"triangle\").gain(0.8)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "octave pulse",
+       "code": "\"<Cm7 Fm7 Bb7 Ebmaj7>\".rootNotes(2).note().add(note(\"0 12 0 12\")).s(\"triangle\").gain(0.8)",
+       "arrivedMs": 2370.384333000002
+      }
+     ],
+     "label": "octave pulse",
+     "code": "\"<Cm7 Fm7 Bb7 Ebmaj7>\".rootNotes(2).note().add(note(\"0 12 0 12\")).s(\"triangle\").gain(0.8)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "syncopated roots",
+       "code": "\"<Cm7 Fm7 Bb7 Ebmaj7>\".rootNotes(2).note().struct(\"x ~ ~ x ~ ~ x ~\").s(\"triangle\").gain(0.8)",
+       "arrivedMs": 3073.194083000002
+      }
+     ],
+     "label": "syncopated roots",
+     "code": "\"<Cm7 Fm7 Bb7 Ebmaj7>\".rootNotes(2).note().struct(\"x ~ ~ x ~ ~ x ~\").s(\"triangle\").gain(0.8)",
+     "warnings": [],
+     "retried": false
+    }
+   ]
+  },
+  {
+   "id": "rewrite-arp",
+   "bufferId": "melody-sketch-arp",
+   "buffer": "setcps(0.5)\nstack(\n  n([0, 2, 4, [5, 7]]).scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5),\n  note(\"d2 ~ a1 ~\").s(\"sawtooth\").lpf(500),\n  s(\"bd ~ sd ~, hh*8\")\n)",
+   "mode": "fix-rewrite",
+   "selection": {
+    "from": 21,
+    "to": 91,
+    "text": "n([0, 2, 4, [5, 7]]).scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)"
+   },
+   "instruction": "",
+   "diagnosis": {
+    "kind": "broken",
+    "stage": "silent",
+    "message": "It runs but makes no sound.",
+    "otherError": false
+   },
+   "originalBroken": false,
+   "firstArrivalMs": 1186.2429170000032,
+   "firstCardMs": 1194.3698750000003,
+   "lastSettledMs": 3068.864834,
+   "totalMs": 3068.9071250000015,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1168.961625,
+    "lastMs": 3040.3970420000005,
+    "totalMs": 3041.937249999999,
+    "tokens": {
+     "input": 222,
+     "output": 352,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.004787100000000001
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "mini-notation melody",
+       "code": "n(\"0 2 4 [5 7]\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+       "arrivedMs": 1186.2429170000032
+      }
+     ],
+     "label": "mini-notation melody",
+     "code": "n(\"0 2 4 [5 7]\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+     "warnings": [],
+     "changeSize": 8,
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "octave up arpeggio",
+       "code": "n(\"0 2 4 [5 7]\").scale(\"D:dorian\").add(note(12)).s(\"square\").lpf(2200).gain(0.4).off(1/8, x => x.add(note(7)).gain(0.25))",
+       "arrivedMs": 1886.2688750000016
+      }
+     ],
+     "label": "octave up arpeggio",
+     "code": "n(\"0 2 4 [5 7]\").scale(\"D:dorian\").add(note(12)).s(\"square\").lpf(2200).gain(0.4).off(1/8, x => x.add(note(7)).gain(0.25))",
+     "warnings": [],
+     "changeSize": 67,
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "two bar phrase",
+       "code": "n(\"<[0 2 4 [5 7]] [7 5 4 [2 0]]>\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+       "arrivedMs": 2237.028542
+      }
+     ],
+     "label": "two bar phrase",
+     "code": "n(\"<[0 2 4 [5 7]] [7 5 4 [2 0]]>\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+     "warnings": [],
+     "changeSize": 22,
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "swung eighths",
+       "code": "n(\"0 2 4 [5 7]\").scale(\"D:dorian\").s(\"square\").lpf(sine.range(800, 2400).slow(4)).gain(0.5).swingBy(1/3, 4)",
+       "arrivedMs": 3057.711625
+      }
+     ],
+     "label": "swung eighths",
+     "code": "n(\"0 2 4 [5 7]\").scale(\"D:dorian\").s(\"square\").lpf(sine.range(800, 2400).slow(4)).gain(0.5).swingBy(1/3, 4)",
+     "warnings": [],
+     "changeSize": 51,
+     "retried": false
+    }
+   ]
+  },
+  {
+   "id": "rewrite-euclid",
+   "bufferId": "drums-sketch-euclid",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*4\"),\n  s(\"~ sd ~ sd\").bank(\"tr909\"),\n  s(\"hh*8\").gain(0.5),\n  s(\"cp\").euclid(3).gain(0.4)\n)",
+   "mode": "fix-rewrite",
+   "selection": {
+    "from": 89,
+    "to": 116,
+    "text": "s(\"cp\").euclid(3).gain(0.4)"
+   },
+   "instruction": "",
+   "diagnosis": {
+    "kind": "broken",
+    "stage": "eval",
+    "message": ".euclid() expects 2 inputs but got 1.",
+    "otherError": false
+   },
+   "originalBroken": true,
+   "firstArrivalMs": 1505.5061249999999,
+   "firstCardMs": 1511.2587080000012,
+   "lastSettledMs": 2064.4162079999987,
+   "totalMs": 2064.8049170000013,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1495.4615840000006,
+    "lastMs": 2044.406750000002,
+    "totalMs": 2054.653792000001,
+    "tokens": {
+     "input": 201,
+     "output": 206,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.0032851
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "euclid 3 of 8",
+       "code": "s(\"cp\").euclid(3, 8).gain(0.4)",
+       "arrivedMs": 1505.5061249999999
+      }
+     ],
+     "label": "euclid 3 of 8",
+     "code": "s(\"cp\").euclid(3, 8).gain(0.4)",
+     "warnings": [],
+     "changeSize": 3,
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "euclid 3 of 8",
+       "code": "s(\"cp\").euclidRot(3, 8, 2).gain(0.4)",
+       "arrivedMs": 1514.0364579999987
+      }
+     ],
+     "label": "euclid 3 of 8",
+     "code": "s(\"cp\").euclidRot(3, 8, 2).gain(0.4)",
+     "warnings": [],
+     "changeSize": 9,
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "euclid 5 of 16",
+       "code": "s(\"cp\").euclid(5, 16).gain(0.4)",
+       "arrivedMs": 1893.7435420000002
+      }
+     ],
+     "label": "euclid 5 of 16",
+     "code": "s(\"cp\").euclid(5, 16).gain(0.4)",
+     "warnings": [],
+     "changeSize": 6,
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "offbeat clap alternation",
+       "code": "s(\"cp\").euclid(\"<3 5>\", 8).gain(0.4).room(0.3)",
+       "arrivedMs": 2054.435874999999
+      }
+     ],
+     "label": "offbeat clap alternation",
+     "code": "s(\"cp\").euclid(\"<3 5>\", 8).gain(0.4).room(0.3)",
+     "warnings": [],
+     "changeSize": 19,
+     "retried": false
+    }
+   ]
+  },
+  {
+   "id": "rewrite-chord-names",
+   "bufferId": "chords-sketch-names",
+   "buffer": "setcps(0.45)\nstack(\n  note(\"Cm7 Fm7\").voicing().s(\"gm_epiano1\").room(0.3),\n  note(\"<c2 f2 bb1 eb2>\").s(\"triangle\").gain(0.8),\n  s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\")\n)",
+   "mode": "fix-rewrite",
+   "selection": {
+    "from": 22,
+    "to": 73,
+    "text": "note(\"Cm7 Fm7\").voicing().s(\"gm_epiano1\").room(0.3)"
+   },
+   "instruction": "play these chords as stabs",
+   "diagnosis": {
+    "kind": "broken",
+    "stage": "silent",
+    "message": "It runs but makes no sound.",
+    "otherError": false
+   },
+   "originalBroken": false,
+   "firstArrivalMs": 2029.3087080000005,
+   "firstCardMs": 2037.7231250000004,
+   "lastSettledMs": 3295.556542000002,
+   "totalMs": 3322.7754170000007,
+   "stats": {
+    "calls": 1,
+    "firstMs": 2012.180457999999,
+    "lastMs": 3265.9745829999993,
+    "totalMs": 3305.3772499999977,
+    "tokens": {
+     "input": 216,
+     "output": 360,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.0048551
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "offbeat stabs",
+       "code": "chord(\"<Cm7 Fm7>\").voicing().struct(\"~ x ~ x\").s(\"gm_epiano1\").release(0.15).room(0.3)",
+       "arrivedMs": 2029.3087080000005
+      }
+     ],
+     "label": "offbeat stabs",
+     "code": "chord(\"<Cm7 Fm7>\").voicing().struct(\"~ x ~ x\").s(\"gm_epiano1\").release(0.15).room(0.3)",
+     "warnings": [],
+     "changeSize": 41,
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "syncopated hits",
+       "code": "chord(\"<Cm7 Fm7>\").voicing().struct(\"x ~ ~ x ~ ~ x ~\").s(\"gm_epiano1\").release(0.1).room(0.3)",
+       "arrivedMs": 2336.654875
+      }
+     ],
+     "label": "syncopated hits",
+     "code": "chord(\"<Cm7 Fm7>\").voicing().struct(\"x ~ ~ x ~ ~ x ~\").s(\"gm_epiano1\").release(0.1).room(0.3)",
+     "warnings": [],
+     "changeSize": 48,
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "short sawtooth stabs",
+       "code": "chord(\"<Cm7 Fm7>\").voicing().struct(\"~ x ~ [x x]\").s(\"sawtooth\").lpf(1800).release(0.12).gain(0.6).room(0.3)",
+       "arrivedMs": 2816.3748750000013
+      }
+     ],
+     "label": "short sawtooth stabs",
+     "code": "chord(\"<Cm7 Fm7>\").voicing().struct(\"~ x ~ [x x]\").s(\"sawtooth\").lpf(1800).release(0.12).gain(0.6).room(0.3)",
+     "warnings": [],
+     "changeSize": 79,
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "euclid brass stabs",
+       "code": "chord(\"<Cm7 Fm7>\").voicing().struct(\"x(3,8)\").s(\"gm_synth_brass_1\").release(0.15).gain(0.7).room(0.3)",
+       "arrivedMs": 3283.4091670000016
+      }
+     ],
+     "label": "euclid brass stabs",
+     "code": "chord(\"<Cm7 Fm7>\").voicing().struct(\"x(3,8)\").s(\"gm_synth_brass_1\").release(0.15).gain(0.7).room(0.3)",
+     "warnings": [],
+     "changeSize": 66,
+     "retried": false
+    }
+   ]
+  }
+ ]
+}

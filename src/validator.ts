@@ -171,7 +171,12 @@ export class Validator {
     const fail = (reason: DropReason, message: string): ValidationResult => ({ ok: false, reason, message, warnings: [], eventCount: 0, changeSize: size, ms });
     if (!result.ok) return fail(sameError(result, fix.originalError) ? 'unfixed' : result.stage, result.message);
     if (result.ms > VALIDATION_TIMEOUT_MS) return fail('timeout', `Took ${Math.round(result.ms)} ms (limit ${VALIDATION_TIMEOUT_MS} ms).`);
-    return { ...this.passed(result, checkedAlone), changeSize: size, ms };
+    const passed = this.passed(result, checkedAlone);
+    // The original's problem was silence (or a sound that isn't loaded), and the option has it too.
+    const stillSilent = fix.originalError.stage === 'silent' && passed.warnings.includes('empty');
+    const stillUnknown = fix.originalError.stage === 'unknown-sample' && passed.warnings.includes('unknown-sample');
+    if (stillSilent || stillUnknown) return fail('unfixed', fix.originalError.message);
+    return { ...passed, changeSize: size, ms };
   }
 
   /**

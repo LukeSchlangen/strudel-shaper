@@ -82,7 +82,7 @@ export function feedbackFor(reason: RetryReason, ctx: FeedbackContext = {}): str
     case 'timeout':
       return 'This code takes too long to compute. Return something lighter: no huge fast() factors or deep nesting.';
     case 'unfixed':
-      return `This still fails with: ${msg}. Return code that fixes this error.`;
+      return `This still fails with: ${msg.replace(/\.$/, '')}. Return code that fixes this error.`;
     case 'buffer':
       return 'The buffer around the selection fails on its own. Return an option that works by itself.';
     case 'empty':

@@ -85,6 +85,17 @@ describe('fix-mode validation', () => {
     expect(r).toMatchObject({ ok: true, checkedAlone: true });
   });
 
+  it('when the original was silent, a still-silent option is `unfixed`, not a silent card', async () => {
+    const hat = 's(0.6).gain("hh*8")';
+    const buffer = broken(hat);
+    const from = buffer.indexOf(hat);
+    const fix = { originalError: { stage: 'silent', message: 'It runs but makes no sound.' } };
+    const still = await validator.validate(buffer, { from, to: from + hat.length }, opt('s(0.6).gain("hh*16")'), [], { fix });
+    expect(still).toMatchObject({ ok: false, reason: 'unfixed', message: 'It runs but makes no sound.' });
+    expect(feedbackFor('unfixed', { message: still.message })).toBe('This still fails with: It runs but makes no sound. Return code that fixes this error.');
+    expect(await validator.validate(buffer, { from, to: from + hat.length }, opt(HH), [], { fix })).toMatchObject({ ok: true, warnings: [] });
+  });
+
   it('a silent fix passes with the `empty` warning (the pipeline retries it)', async () => {
     const hat = 's("hh*8").gian(0.6)';
     expect(await check(broken(hat), hat, 's("hh*8").gain(0.6).mask("0")')).toMatchObject({ ok: true, warnings: ['empty'] });
