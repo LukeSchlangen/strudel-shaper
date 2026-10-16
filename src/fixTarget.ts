@@ -165,7 +165,8 @@ async function soundProblem(validator: DiagnoseInput['validator'], buffer: strin
 }
 
 function eventProblem(validator: DiagnoseInput['validator'], events: { eventCount: number; sounds: string[] }): FixError | null {
-  if (events.eventCount === 0) return { stage: 'silent', message: 'It runs but makes no sound.' };
+  // Onsets without a playable sound (`s(0.4)`: no sound key) are silent too.
+  if (events.eventCount === 0 || events.sounds.length === 0) return { stage: 'silent', message: 'It runs but makes no sound.' };
   const unknown = events.sounds.filter((s) => !validator.hasSound(s));
   if (unknown.length) {
     return { stage: 'unknown-sample', message: `${unknown.map((s) => `\`${s}\``).join(', ')} ${unknown.length > 1 ? 'are not loaded sounds' : 'is not a loaded sound'}.` };

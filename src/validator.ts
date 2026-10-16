@@ -182,7 +182,8 @@ export class Validator {
     const own = result.span ?? result;
     const warnings: Warning[] = [];
     const unknownSounds = own.sounds.filter((s) => !this.deps.hasSound(s));
-    if (own.eventCount === 0) warnings.push('empty');
+    // Onsets with no playable sound (a rest or non-string `s`, so no sound key) are silent too.
+    if (own.eventCount === 0 || own.sounds.length === 0) warnings.push('empty');
     if (unknownSounds.length) warnings.push('unknown-sample');
     return {
       ok: true,

@@ -1,5 +1,6 @@
 import type { RetryReason } from '../src/feedback';
 import type { RequestStats } from '../src/pipeline';
+import type { Mode } from '../src/provider';
 
 export interface SlotResult {
   status: 'ready' | 'dropped' | 'validating' | 'empty';
@@ -8,6 +9,8 @@ export interface SlotResult {
   warnings?: string[];
   unknownSounds?: string[];
   checkedAlone?: boolean;
+  /** Fix modes: characters changed against the selection. */
+  changeSize?: number;
   retried?: boolean;
   drop?: { reason: RetryReason; message: string };
   /** Every option this slot received, in order (the first, then any replacement). */
@@ -18,8 +21,14 @@ export interface RequestResult {
   id: string;
   bufferId: string;
   buffer: string;
+  /** Absent in reports from before milestone 5 (shape). */
+  mode?: Mode;
   selection: { from: number; to: number; text: string };
   instruction: string;
+  /** Fix modes: what diagnoseFix found. */
+  diagnosis?: { kind: string; stage?: string; message?: string; line?: number; otherError?: boolean };
+  /** Fix modes: the original doesn't evaluate (card 0 is "original (broken)"). */
+  originalBroken?: boolean;
   /** First option from the provider, before validation. */
   firstArrivalMs?: number;
   /** First card shown (validated): the number the 2 s target is about. */
@@ -92,7 +101,7 @@ export function summarise(report: Report): string {
     `| Last slot settled (retries incl.) | ${sec(pct(last, 50))} | ${sec(pct(last, 90))} | ${sec(Math.max(...last))} | ${last.filter((v) => v <= TARGET_MS).length}/${r.length} |`,
     '',
     `- **Pass rate, first attempt** (validated with no warning and no retry): ${cleanFirst}/${firstAttempts.length} (${Math.round((100 * cleanFirst) / (firstAttempts.length || 1))}%)`,
-    `- **Cards shown**: ${slotsReady.length}/${r.length * 4} slots (${offered} options offered first; ${r.filter((x) => x.slots.filter((s) => s.status === 'ready').length >= 3).length}/${r.length} requests ended with ≥ 3 cards)`,
+    `- **Cards shown**: ${slotsReady.length}/${r.reduce((n, x) => n + x.slots.length, 0)} slots (${offered} options offered first; ${r.filter((x) => x.slots.filter((s) => s.status === 'ready').length >= 3).length}/${r.length} requests ended with ≥ 3 cards)`,
     `- Retries by reason: ${count(r.flatMap((x) => x.retries.map((y) => y.reason)))}`,
     `- Drops by reason: ${count(r.flatMap((x) => x.drops.map((y) => y.reason)))}`,
     `- Warnings on shown cards: ${count(warnings)}`,
@@ -100,5 +109,39 @@ export function summarise(report: Report): string {
     `- Tokens per request: ${Math.round(tokensIn / n)} in (${Math.round(cached / n)} cache reads), ${Math.round(out / n)} out; ${(calls / n).toFixed(2)} calls`,
     `- **Cost per request**: $${(cost / n).toFixed(5)} (total $${cost.toFixed(4)})`,
   ];
+  const sameSound = r.flatMap((x) => [...x.retries, ...x.drops]).filter((y) => y.reason === 'identical' && /sounds exactly/.test(y.message)).length;
+  lines.push(`- Sounds the same as the original (fingerprint): ${sameSound} retried or dropped`);
+  if (r.some((x) => x.mode && x.mode !== 'shape')) lines.push('', ...fixSummary(r));
   return lines.join('\n') + '\n';
+}
+
+/** A card that fixes the request: it passed the fix test (whole buffer works, or alone when the buffer has another error) and sounds. */
+const fixes = (s: SlotResult) => s.status === 'ready' && !(s.warnings ?? []).length;
+
+/** Fix runs: fix rate, first-try fix rate, change size of minimal fixes, and a row per request. */
+function fixSummary(r: RequestResult[]): string[] {
+  const sent = r.filter((x) => !x.error?.startsWith('no request'));
+  const fixed = sent.filter((x) => x.slots.some(fixes));
+  const firstTry = sent.filter((x) => {
+    const s = x.slots[0];
+    return s && fixes(s) && s.attempts.length === 1;
+  });
+  const minimal = r.filter((x) => x.mode === 'fix-minimal');
+  const sizes = minimal.flatMap((x) => x.slots.filter(fixes).map((s) => s.changeSize ?? 0));
+  const cell = (v: string) => v.replace(/\|/g, '\\|').replace(/\n/g, ' ⏎ ');
+  return [
+    `- **Fix rate** (≥ 1 card that works in the whole buffer and sounds): ${fixed.length}/${sent.length}`,
+    `- **First-try fix rate** (card 1, first attempt, no retry): ${firstTry.length}/${sent.length}`,
+    `- **Change size of minimal fixes** (characters): p50 ${pct(sizes, 50) ?? '—'} · p90 ${pct(sizes, 90) ?? '—'} · max ${sizes.length ? Math.max(...sizes) : '—'} (${sizes.length} cards)`,
+    `- Requests not sent: ${r.length - sent.length}${r.length > sent.length ? ` (${r.filter((x) => !sent.includes(x)).map((x) => `${x.id}: ${x.error}`).join('; ')})` : ''}`,
+    '',
+    '| Request | Mode | Diagnosis | Cards | First card | Change | Retries |',
+    '| --- | --- | --- | --- | --- | --- | --- |',
+    ...r.map((x) => {
+      const ready = x.slots.filter((s) => s.status === 'ready');
+      const first = ready[0];
+      const diag = x.diagnosis ? `${x.diagnosis.stage ?? x.diagnosis.kind}${x.diagnosis.otherError ? ' + other' : ''}` : '';
+      return `| ${x.id} | ${x.mode} | ${diag} | ${ready.length}/${x.slots.length} | ${first ? `${cell(first.label ?? '')}: \`${cell(first.code ?? '')}\`` : '—'} | ${x.mode === 'fix-minimal' ? ready.map((s) => s.changeSize).join(', ') : ''} | ${x.retries.map((y) => y.reason).join(', ')} |`;
+    }),
+  ];
 }

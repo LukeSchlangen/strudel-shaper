@@ -1,6 +1,7 @@
 import '@strudel/repl/repl-component.mjs';
 import { getAudioContext } from '@strudel/webaudio';
-import { diffSegments } from './diff';
+import { silence } from '@strudel/core';
+import { LARGE_CHANGE_CHARS, diffSegments, type DiffGranularity } from './diff';
 import { reasonLabel, type RetryReason } from './feedback';
 import { Quantizer } from './quantize';
 import { splice } from './splice';
@@ -35,6 +36,11 @@ reportSelect.innerHTML = names.map((n) => `<option value="${n}">${n.split('/').p
 let report: Report | null = null;
 let index = 0;
 let heard = 0;
+/**
+ * Fix reports whose original doesn't evaluate: what was playing when the request was shown (or
+ * silence). 0 goes back to it, as 0/Esc do in the tray, instead of evaluating the broken buffer.
+ */
+let snapshot: any = null;
 
 type Notes = Record<string, { ratings: Record<number, string>; note: string }>;
 const notesKey = () => `shaper-listen:${report?.label}:${report?.createdAt}`;
@@ -89,9 +95,11 @@ async function show() {
   if (!r || !report) return;
   heard = 0;
   mirror.setCode(r.buffer);
-  if (mirror.repl.scheduler.started) await evaluate(r.buffer);
+  snapshot = r.originalBroken ? (mirror.repl.scheduler.started ? quantizer.playing() : silence) : null;
+  if (mirror.repl.scheduler.started && !r.originalBroken) await evaluate(r.buffer);
   $('position').textContent = `${index + 1}/${report.results.length}`;
-  $('request-meta').textContent = `${r.id} · "${r.instruction || '(no instruction)'}" · first card ${sec(r.firstCardMs)} · ${r.error ?? ''}`;
+  const fixing = r.diagnosis?.message ? ` · ${r.mode}: ${r.diagnosis.message}${r.diagnosis.line ? ` (line ${r.diagnosis.line})` : ''}` : '';
+  $('request-meta').textContent = `${r.id}${fixing} · "${r.instruction || '(no instruction)'}" · first card ${sec(r.firstCardMs)} · ${r.error ?? ''}`;
   render();
 }
 
@@ -113,6 +121,7 @@ async function audition(slot: number) {
   if (slot !== 0 && (option?.status !== 'ready' || !option.code)) return;
   heard = slot;
   render();
+  if (slot === 0 && snapshot) return quantizer.swapTo(snapshot);
   await evaluate(slot === 0 ? r.buffer : splice(r.buffer, r.selection, option.code!));
 }
 
@@ -123,7 +132,8 @@ function render() {
   const mine = notes[r.id] ?? { ratings: {}, note: '' };
   const card = (slot: number, label: string, body: string, extra = '') =>
     `<div class="card ${slot === heard ? 'heard' : ''}" data-slot="${slot}"><b>${slot}</b> ${esc(label)}${extra}<code>${body}</code></div>`;
-  const cards = [card(0, 'original', esc(r.selection.text))];
+  const cards = [card(0, r.originalBroken ? 'original (broken)' : 'original', esc(r.selection.text))];
+  const granularity: DiffGranularity = r.mode === 'fix-minimal' ? 'char' : 'word';
   r.slots.forEach((s, i) => {
     const slot = i + 1;
     if (s.status !== 'ready' || !s.code) {
@@ -131,11 +141,13 @@ function render() {
       cards.push(`<div class="card dropped"><b>${slot}</b> ${esc(why)}<code>${esc(s.attempts.at(-1)?.code ?? '')}</code></div>`);
       return;
     }
-    const badges = [...(s.warnings ?? []), ...(s.retried ? ['retried'] : []), ...(s.checkedAlone ? ['checked alone'] : [])]
+    const large = granularity === 'char' && (s.changeSize ?? 0) > LARGE_CHANGE_CHARS ? ['large change'] : [];
+    const badges = [...(s.warnings ?? []), ...(s.retried ? ['retried'] : []), ...(s.checkedAlone ? ['checked alone'] : []), ...large]
       .map((b) => `<span class="badge">${esc(b)}</span>`)
       .join('');
     const rating = `<select data-rate="${slot}">${['', 'great', 'good', 'meh', 'bad', 'broken'].map((v) => `<option ${mine.ratings[slot] === v ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
-    cards.push(card(slot, s.label ?? '', diff(r.selection.text, s.code), badges + rating));
+    const size = s.changeSize !== undefined && granularity === 'char' ? ` <small>${s.changeSize} ch</small>` : '';
+    cards.push(card(slot, s.label ?? '', diff(r.selection.text, s.code, granularity), badges + size + rating));
   });
   trayEl.innerHTML = `<div class="meta">1–4 audition · 0 original · N/P request · T swap: ${quantizer.mode} · ${ready(r).length} cards</div><div class="cards">${cards.join('')}</div><textarea id="notes" rows="2" placeholder="Notes for this request">${esc(mine.note)}</textarea>`;
   trayEl.querySelectorAll<HTMLSelectElement>('select[data-rate]').forEach((sel) =>
@@ -154,9 +166,9 @@ function render() {
   statusEl.textContent = `${report?.label} · ${heard === 0 ? 'original' : `option ${heard}`}`;
 }
 
-const diff = (a: string, b: string) =>
-  diffSegments(a, b)
-    .map(({ kind, text }) => (kind === 'same' ? esc(text) : `<${kind}>${esc(text)}</${kind}>`))
+const diff = (a: string, b: string, granularity: DiffGranularity) =>
+  diffSegments(a, b, granularity)
+    .map(({ kind, text, shown }) => (kind === 'same' ? esc(text) : `<${kind}${granularity === 'char' ? ' class="char"' : ''}>${esc(shown ?? text)}</${kind}>`))
     .join('');
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 

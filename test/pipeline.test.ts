@@ -29,7 +29,7 @@ class FakeBackend implements ValidationBackend {
     if (this.gate) await this.gate;
     return code.includes('BAD')
       ? { ok: false, stage: 'syntax', message: 'Unexpected token', ms: 2 }
-      : { ok: true, eventCount: 8, sounds: [], ms: 3 };
+      : { ok: true, eventCount: 8, sounds: ['hh'], ms: 3 };
   }
 }
 
