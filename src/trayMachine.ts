@@ -97,6 +97,10 @@ export type Effect =
   | { type: 'resumeHighlight' }
   | { type: 'auditionOption'; slot: Slot; code: string }
   | { type: 'evaluateEditor' }
+  /** Fix modes on code that doesn't evaluate: remember what is playing now (the last good pattern)… */
+  | { type: 'snapshotPlaying' }
+  /** …and go back to it (0/Esc), quantized like any swap, instead of evaluating the broken original. */
+  | { type: 'restoreSnapshot' }
   | { type: 'commit'; capture: Capture; code: string };
 
 export interface Transition {
@@ -121,10 +125,16 @@ function openTray(req: TrayRequest, requestId: number): Transition {
   };
 }
 
+/** The original can't be evaluated, so "back to the original" means back to what played before the tray. */
+const restoresSnapshot = (t: { fix?: TrayFix }) => !!t.fix?.broken;
+
 export function transition(state: TrayState, event: TrayEvent): Transition {
   switch (state.kind) {
     case 'playing':
-      if (event.type === 'request') return openTray(event, event.requestId);
+      if (event.type === 'request') {
+        const opened = openTray(event, event.requestId);
+        return restoresSnapshot(event) ? { ...opened, effects: [{ type: 'snapshotPlaying' }, ...opened.effects] } : opened;
+      }
       return stay(state);
 
     case 'tray':
@@ -138,7 +148,8 @@ export function transition(state: TrayState, event: TrayEvent): Transition {
 
 function trayTransition(state: Tray, event: TrayEvent): Transition {
   const abort: Effect[] = state.done ? [] : [{ type: 'abortRequest' }];
-  const restoreOriginal: Effect[] = state.heard === 0 ? [] : [{ type: 'evaluateEditor' }, { type: 'resumeHighlight' }];
+  const restoreOriginal: Effect[] =
+    state.heard === 0 ? [] : [{ type: restoresSnapshot(state) ? 'restoreSnapshot' : 'evaluateEditor' }, { type: 'resumeHighlight' }];
   const backToOriginal = (patch: Partial<Tray> = {}, effects: Effect[] = []): Transition => ({
     state: { ...state, heard: 0, ...patch },
     effects: [...effects, ...restoreOriginal],
@@ -153,7 +164,10 @@ function trayTransition(state: Tray, event: TrayEvent): Transition {
       if (event.type === 'regenerate' && state.stale) return stay(state);
       const req = event.type === 'request' ? event : state;
       const next = openTray(req, event.requestId);
-      return { state: next.state, effects: [...abort, ...restoreOriginal, ...next.effects] };
+      // A broken-code tray replacing one that already holds the snapshot keeps it: what plays after
+      // restoreOriginal is that snapshot. Otherwise, after restoreOriginal, the original is playing.
+      const snap: Effect[] = restoresSnapshot(req) && !restoresSnapshot(state) ? [{ type: 'snapshotPlaying' }] : [];
+      return { state: next.state, effects: [...abort, ...restoreOriginal, ...snap, ...next.effects] };
     }
 
     case 'optionArrived':

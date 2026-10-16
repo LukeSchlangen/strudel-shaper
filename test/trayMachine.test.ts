@@ -326,3 +326,46 @@ describe('tray state machine: validation', () => {
     expect(slotsOf(state).map((s) => s.status)).toEqual(['ready', 'empty', 'empty', 'empty']);
   });
 });
+
+describe('fix modes on broken code: 0/Esc restore what played before the tray', () => {
+  const fix = { broken: true, error: 'x is not a function', context: { originalError: { stage: 'eval', message: 'x is not a function' } } };
+  const fixRequest: TrayEvent = { type: 'request', requestId: 1, capture, mode: 'fix-minimal', instruction: '', fix };
+  const fixReady: TrayEvent[] = [fixRequest, arrive(1), { type: 'requestDone', requestId: 1 }];
+  const heard1: TrayEvent = { type: 'audition', slot: 1 };
+
+  it('snapshots what is playing when the tray opens, before the request starts', () => {
+    const { effects, state } = run([fixRequest]);
+    expect(effects.map((e) => e.type)).toEqual(['snapshotPlaying', 'startRequest']);
+    expect(state).toMatchObject({ kind: 'tray', fix });
+  });
+
+  it('0 and Esc restore the snapshot, not the editor text', () => {
+    for (const back of [{ type: 'audition', slot: 0 }, { type: 'escape' }] as TrayEvent[]) {
+      expect(after([...fixReady, heard1], [back]).effects).toEqual([{ type: 'restoreSnapshot' }, { type: 'resumeHighlight' }]);
+    }
+  });
+
+  it('a fix that fails live also falls back to the snapshot', () => {
+    expect(after([...fixReady, heard1], [{ type: 'evalFailed', slot: 1 }]).effects).toEqual([{ type: 'restoreSnapshot' }, { type: 'resumeHighlight' }]);
+  });
+
+  it('commit still writes the fix and evaluates the editor (which now works)', () => {
+    expect(after([...fixReady, heard1], [{ type: 'enter' }]).effects.map((e) => e.type)).toEqual(['commit', 'evaluateEditor', 'resumeHighlight']);
+  });
+
+  it('regenerate keeps the snapshot it has (no second snapshot of a fix that is playing)', () => {
+    const { effects } = after([...fixReady, heard1], [{ type: 'regenerate', requestId: 2 }]);
+    expect(effects.map((e) => e.type)).toEqual(['restoreSnapshot', 'resumeHighlight', 'startRequest']);
+  });
+
+  it('a broken-code fix opened over a shape tray snapshots after the original is back', () => {
+    const { effects } = after([...ready, { type: 'audition', slot: 2 }], [{ ...fixRequest, requestId: 2 }]);
+    expect(effects.map((e) => e.type)).toEqual(['evaluateEditor', 'resumeHighlight', 'snapshotPlaying', 'startRequest']);
+  });
+
+  it('fix modes on code that evaluates (a silent selection, a rewrite of working code) re-evaluate the editor as shape mode does', () => {
+    const working: TrayEvent = { ...fixRequest, mode: 'fix-rewrite', fix: { broken: false } };
+    expect(run([working]).effects.map((e) => e.type)).toEqual(['startRequest']);
+    expect(after([working, arrive(1), heard1], [{ type: 'escape' }]).effects).toEqual([{ type: 'evaluateEditor' }, { type: 'resumeHighlight' }]);
+  });
+});

@@ -3,17 +3,39 @@ import { diffChars, diffWordsWithSpace } from 'diff';
 export interface DiffSegment {
   kind: 'same' | 'ins' | 'del';
   text: string;
+  /**
+   * What to display, when it differs from `text`: an inserted or deleted run of only whitespace is
+   * invisible on its own, so spaces show as `·` and newlines as `⏎`.
+   */
+  shown?: string;
 }
 
+export type DiffGranularity = 'word' | 'char';
+
+/** A char diff with more changed runs than this is noise (a rewrite, not a fix): show the word diff instead. */
+export const MAX_CHAR_CHANGES = 12;
+
 /**
- * Word-level diff of an option against the captured selection, for the tray cards.
- * Uses the whitespace-preserving variant so same+del rebuilds `before` and same+ins rebuilds `after` exactly.
+ * Diff of an option against the captured selection, for the tray cards. Word level by default;
+ * `char` for minimal fixes, where the whole change is often one quote, bracket or letter that a
+ * word diff would hide inside a changed word. Whitespace-preserving, so same+del rebuilds `before`
+ * and same+ins rebuilds `after` exactly.
  */
-export function diffSegments(before: string, after: string): DiffSegment[] {
-  return diffWordsWithSpace(before, after).map((c) => ({
-    kind: c.added ? 'ins' : c.removed ? 'del' : 'same',
-    text: c.value,
-  }));
+export function diffSegments(before: string, after: string, granularity: DiffGranularity = 'word'): DiffSegment[] {
+  if (granularity === 'char') {
+    const chars = diffChars(before, after).map(toSegment);
+    if (chars.filter((c) => c.kind !== 'same').length <= MAX_CHAR_CHANGES) return chars.map(showWhitespace);
+  }
+  return diffWordsWithSpace(before, after).map(toSegment);
+}
+
+function toSegment(c: { added?: boolean; removed?: boolean; value: string }): DiffSegment {
+  return { kind: c.added ? 'ins' : c.removed ? 'del' : 'same', text: c.value };
+}
+
+function showWhitespace(seg: DiffSegment): DiffSegment {
+  if (seg.kind === 'same' || /\S/.test(seg.text)) return seg;
+  return { ...seg, shown: seg.text.replace(/ /g, '·').replace(/\t/g, '→').replace(/\n/g, '⏎\n') };
 }
 
 /**

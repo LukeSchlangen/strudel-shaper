@@ -1,12 +1,12 @@
 import '@strudel/repl/repl-component.mjs';
 import { getAudioContext, soundMap } from '@strudel/webaudio';
-import { Pattern, strudelScope } from '@strudel/core';
+import { Pattern, silence, strudelScope } from '@strudel/core';
 import { addWidget, setSliderWidgets, sliderValues } from '@strudel/codemirror';
 import { EditorView } from '@codemirror/view';
 import { StateEffect } from '@codemirror/state';
 import { captureRange } from './capture';
 import { commitSpec } from './commit';
-import { diffSegments } from './diff';
+import { LARGE_CHANGE_CHARS, diffSegments, type DiffGranularity } from './diff';
 import { diagnoseFix, noRequestReason, trayFix, type TrayFix } from './fixTarget';
 import { InstructionBox } from './instructionBox';
 import { InstructionHistory } from './instructionHistory';
@@ -270,6 +270,28 @@ function evaluateCode(code: string, label: string, audition?: { range: Range }):
   return result;
 }
 
+/**
+ * Fix modes on code that doesn't evaluate: what was playing when the tray opened, and the tempo.
+ * 0/Esc swap back to it (quantized, through the same queue as evaluations), since evaluating the
+ * broken original would fail and leave the last auditioned fix playing.
+ */
+let snapshot: { pattern: any; cps: number } | null = null;
+
+function restoreSnapshot(): Promise<unknown> {
+  const generation = ++evalGeneration;
+  const result = evalChain.then(() => {
+    if (generation !== evalGeneration || !snapshot) return true;
+    const before = clockSnapshot();
+    if (snapshot.cps !== scheduler.cps) scheduler.setCps(snapshot.cps);
+    quantizer.swapTo(snapshot.pattern);
+    mirror.drawer?.invalidate?.(scheduler);
+    logSwap('original (restored)', before, clockSnapshot());
+    return true;
+  });
+  evalChain = result;
+  return result;
+}
+
 // Outside evaluations (Ctrl/Alt+Enter, the Play button) reset the tray. Signal: the element's
 // `update` event. Its detail is the whole repl state, so watch for the `pending` false→true edge,
 // which repl.evaluate emits synchronously on entry (repl.mjs:227).
@@ -408,6 +430,13 @@ async function run(effect: Effect) {
     }
     case 'evaluateEditor':
       await evaluateCode(mirror.code, 'original');
+      return;
+    case 'snapshotPlaying':
+      // Nothing playing yet: an audition will start the clock, and going back means silence.
+      snapshot = { pattern: scheduler.started ? quantizer.playing() : silence, cps: scheduler.cps };
+      return;
+    case 'restoreSnapshot':
+      await restoreSnapshot();
       return;
     case 'commit':
       view.dispatch(commitSpec(liveRange!, effect.code));
@@ -645,8 +674,17 @@ function render() {
   trayEl.hidden = false;
   trayEl.classList.toggle('is-stale', tray.stale);
 
-  const original = card(0, ['original', tray.heard === 0 ? 'heard' : ''], 'original', codeHtml(tray.capture.text));
-  const options = tray.slots.map((s, i) => slotCard(i + 1, s, tray.heard, tray.capture.text));
+  const broken = !!tray.fix?.broken;
+  const original = card(0, ['original', tray.heard === 0 ? 'heard' : ''], broken ? 'original (broken)' : 'original', codeHtml(tray.capture.text), {
+    title: tray.fix?.error ? `${tray.fix.error}${broken ? '\n0/Esc go back to what was playing before ⌘J.' : ''}` : undefined,
+  });
+  // A minimal fix shows the exact characters it changed; elsewhere a word diff reads better.
+  const granularity: DiffGranularity = tray.mode === 'fix-minimal' ? 'char' : 'word';
+  const options = tray.slots
+    .map((s, i) => ({ s, slot: i + 1 }))
+    // A minimal fix usually has one option: don't show the unused second slot as "no option".
+    .filter(({ s, slot }) => !(tray.mode === 'fix-minimal' && slot > 1 && s.status === 'empty'))
+    .map(({ s, slot }) => slotCard(slot, s, tray.heard, tray.capture.text, granularity));
 
   const times = timing?.requestId === tray.requestId ? timing : null; // never show the previous request's times
   const ms = (v?: number) => (v === undefined ? '…' : v < 1000 ? `${Math.round(v)} ms` : `${(v / 1000).toFixed(1)} s`);
@@ -659,7 +697,9 @@ function render() {
       (stats.costUsd !== undefined ? ` · $${stats.costUsd.toFixed(4)}` : '') +
       (stats.calls > 1 ? ` · ${stats.calls} calls` : '')
     : null;
+  const fixing = tray.fix?.error ? `${tray.mode === 'fix-minimal' ? 'fixing' : 'rewriting'}: ${tray.fix.error.slice(0, 80)}${tray.fix.errorAt?.line ? ` (line ${tray.fix.errorAt.line})` : ''}` : null;
   const status = [
+    fixing,
     `provider: ${times?.provider ?? providerLabel()}`,
     `first ${ms(times?.firstMs)}`,
     `last ${tray.done ? ms(times?.lastMs) : '…'}`,
@@ -690,7 +730,7 @@ function providerLabel() {
 
 const placeholder = (text: string) => `<span class="placeholder">${escapeHtml(text)}</span>`;
 
-function slotCard(slot: number, s: SlotCard, heard: Slot, original: string) {
+function slotCard(slot: number, s: SlotCard, heard: Slot, original: string, granularity: DiffGranularity) {
   const classes = [s.status, slot === heard ? 'heard' : ''];
   const why = s.drop ? reasonLabel(s.drop.reason, s.drop.message) : '';
   switch (s.status) {
@@ -709,14 +749,16 @@ function slotCard(slot: number, s: SlotCard, heard: Slot, original: string) {
       const label = s.status === 'failed' ? `${s.option!.label} (failed)` : s.option!.label;
       const badges = (s.warnings ?? []).map((w) => (w === 'empty' ? 'empty' : `unknown sample: ${(s.unknownSounds ?? []).join(', ')}`));
       if (s.checkedAlone) badges.push('checked alone');
+      if (granularity === 'char' && (s.changeSize ?? 0) > LARGE_CHANGE_CHARS) badges.push('large change');
       if (s.retried) badges.push('retried');
       const title = [
         s.retried && s.drop ? `Retried after ${why}: ${s.drop.message}` : '',
         s.checkedAlone ? 'The buffer itself fails to evaluate, so this option was checked on its own. Auditioning it plays the whole buffer, which may fail.' : '',
+        s.changeSize !== undefined && granularity === 'char' ? `${s.changeSize} characters changed` : '',
       ]
         .filter(Boolean)
         .join('\n') || undefined;
-      return card(slot, classes, label, diffHtml(original, s.option!.code), { badges, title });
+      return card(slot, classes, label, diffHtml(original, s.option!.code, granularity), { badges, title });
     }
   }
 }
@@ -727,9 +769,10 @@ function card(slot: number, classes: string[], label: string, body: string, extr
   return `<div class="card ${classes.join(' ')}" data-slot="${slot}"${title}><b>${slot}</b> ${escapeHtml(label)}${badges}<code>${body}</code></div>`;
 }
 
-function diffHtml(before: string, after: string) {
-  return diffSegments(before, after)
-    .map(({ kind, text }) => (kind === 'same' ? codeHtml(text) : `<${kind}>${codeHtml(text)}</${kind}>`))
+function diffHtml(before: string, after: string, granularity: DiffGranularity = 'word') {
+  const cls = granularity === 'char' ? ' class="char"' : '';
+  return diffSegments(before, after, granularity)
+    .map(({ kind, text, shown }) => (kind === 'same' ? codeHtml(text) : `<${kind}${cls}>${codeHtml(shown ?? text)}</${kind}>`))
     .join('');
 }
 

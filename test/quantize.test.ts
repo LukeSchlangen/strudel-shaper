@@ -152,6 +152,36 @@ describe('Quantizer', () => {
     expect(kicks(s.played)).toEqual(Array.from({ length: 12 }, (_, i) => i * 0.25));
   });
 
+  it('restoring a snapshot (fix modes) lands on the beat, and the restored pattern is the snapshot itself', async () => {
+    const good = await pat('s("bd*4, hh*8")');
+    const s = new FakeScheduler(good);
+    const q = new Quantizer(s);
+    s.tickUntil(1.1);
+    const snapshot = q.playing(); // the tray opens over a broken buffer
+    expect(snapshot).toBe(good);
+    s.swap(q, await pat('s("bd*4, oh*8")')); // audition a fix: lands at 1.25
+    s.tickUntil(1.6);
+    q.swapTo(snapshot); // 0 / Esc
+    expect(q.pending!.at).toBe(1.75);
+    s.tickUntil(3);
+    q.settle();
+    expect(s.pattern).toBe(good); // no wrapper left: the restored pattern is the snapshot object
+    const ohs = s.played.filter(([, x]) => x === 'oh').map(([t]) => t);
+    expect(ohs[0]).toBe(1.25);
+    expect(ohs.at(-1)).toBeLessThan(1.75);
+    expect(s.played.filter(([t, x]) => x === 'hh' && t >= 1.75)[0][0]).toBe(1.75);
+    expect(kicks(s.played)).toEqual(Array.from({ length: 12 }, (_, i) => i * 0.25));
+  });
+
+  it('a snapshot taken while a swap is pending is the pattern about to land', async () => {
+    const s = new FakeScheduler(await pat('s("bd*4, hh*8")'));
+    const q = new Quantizer(s);
+    s.tickUntil(1.1);
+    const next = await pat('s("bd*4, cp*8")');
+    s.swap(q, next);
+    expect(q.playing()).toBe(next);
+  });
+
   it('many presses at random times: every kick exactly once, every swap on a beat', async () => {
     const pats = await Promise.all(['hh', 'oh', 'cp', 'rim', 'sd'].map((x) => pat(`s("bd*4, ${x}*8")`)));
     const s = new FakeScheduler(pats[0]);

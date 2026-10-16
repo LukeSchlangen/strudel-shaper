@@ -22,6 +22,10 @@ header button { background: #2a2a2a; color: #ddd; border: 1px solid #444; paddin
 #tray .card code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 #tray .card ins { text-decoration: none; color: #9ece6a; background: #24331c; }
 #tray .card del { color: #f7768e; background: #3a1f25; text-decoration: line-through; }
+/* Minimal fixes: a changed quote or bracket must stand out on its own, so each change is a solid block. */
+#tray .card ins.char, #tray .card del.char { display: inline-block; min-width: 0.7em; text-align: center; border-radius: 2px; font-weight: bold; }
+#tray .card ins.char { color: #1a1b26; background: #9ece6a; }
+#tray .card del.char { color: #1a1b26; background: #f7768e; text-decoration: line-through; }
 #tray .card.pending, #tray .card.empty, #tray .card.validating, #tray .card.retrying, #tray .card.dropped { cursor: default; color: #777; border-style: dashed; }
 #tray .card .placeholder { color: #666; font-style: italic; }
 #tray .card.failed code { opacity: 0.6; }

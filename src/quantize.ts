@@ -112,6 +112,24 @@ export class Quantizer {
     });
   }
 
+  /** What will be playing once any pending swap lands: the pattern to snapshot before auditioning. */
+  playing(): any {
+    return this.pending?.next ?? this.scheduler.pattern;
+  }
+
+  /**
+   * Swaps to an existing pattern (a snapshot), quantized like our own evaluations. Used when the
+   * original can't be evaluated: 0/Esc in fix modes go back to what played before the tray opened.
+   */
+  swapTo(pattern: any) {
+    this.armed = true;
+    try {
+      void this.scheduler.setPattern(pattern);
+    } finally {
+      this.armed = false;
+    }
+  }
+
   cycleMode(): SwapMode {
     this.mode = SWAP_MODES[(SWAP_MODES.indexOf(this.mode) + 1) % SWAP_MODES.length];
     return this.mode;
