@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ProviderError, type OptionRequest, type ProviderStats } from '../src/provider';
 import { LineSplitter } from '../src/remoteProtocol';
-import { RemoteProvider } from '../src/remoteProvider';
+import { RemoteProvider, modelForMode } from '../src/remoteProvider';
 
 const req: OptionRequest = { mode: 'shape', buffer: 's("hh*8")', selection: { from: 0, to: 9, text: 's("hh*8")' }, instruction: '', cps: 0.5 };
 const lines = [
@@ -97,5 +97,27 @@ describe('RemoteProvider', () => {
     const c = new AbortController();
     await collect(new RemoteProvider({ provider: 'claude', model: 'm', fetch: f.fn }), c.signal);
     expect(f.sent[0].signal).toBe(c.signal);
+  });
+});
+
+describe('the model per mode', () => {
+  it('?fixModel= / ?rewriteModel= pick the fix models; without them a fix mode is left to the proxy', () => {
+    const pick = modelForMode(new URLSearchParams('rewriteModel=claude-haiku-5-5'), 'claude-sonnet-5-5');
+    expect(pick('shape')).toBe('claude-sonnet-5-5');
+    expect(pick('fix-minimal')).toBeNull();
+    expect(pick('fix-rewrite')).toBe('claude-haiku-5-5');
+    expect(modelForMode(new URLSearchParams('fixModel=claude-sonnet-5-5'), 'claude-haiku-5-5')('fix-minimal')).toBe('claude-sonnet-5-5');
+  });
+
+  it('sends the model only when one is chosen, and reports the model the proxy answered with', async () => {
+    const done = { ...lines[2], model: 'claude-sonnet-5-5' };
+    const f = fakeFetch([lines[0], done].map((l) => JSON.stringify(l) + '\n').join(''));
+    const p = new RemoteProvider({ provider: 'claude', model: 'claude-haiku-5-5', modelFor: modelForMode(new URLSearchParams(), 'claude-haiku-5-5'), fetch: f.fn });
+    const stats: ProviderStats[] = [];
+    for await (const _ of p.generateOptions({ ...req, mode: 'fix-rewrite' }, new AbortController().signal, { onStats: (s) => stats.push(s) })) void _;
+    expect('model' in f.sent[0].body).toBe(false);
+    expect(stats[0].model).toBe('claude-sonnet-5-5');
+    for await (const _ of p.generateOptions(req, new AbortController().signal)) void _;
+    expect(f.sent[1].body.model).toBe('claude-haiku-5-5');
   });
 });

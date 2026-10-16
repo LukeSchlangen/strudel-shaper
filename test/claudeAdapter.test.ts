@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createApp } from '../server/app';
 import { mapError } from '../server/errors';
 import { buildParams, streamClaudeOptions, type ClaudeDeps } from '../server/providers/claude';
+import { MODE_DEFAULT_MODELS } from '../server/providers/models';
 import { RateLimiter } from '../server/rateLimit';
 import { LineSplitter, type RemoteLine, type RemoteRequest } from '../src/remoteProtocol';
 import { FakeMessages, textEvents } from './fakeAnthropic';
@@ -213,6 +214,21 @@ describe('POST /api/options', () => {
     const res = await post(app, req);
     expect(res.headers.get('content-type')).toBe('application/x-ndjson');
     expect((await readLines(res)).map((l) => l.type)).toEqual(['option', 'option', 'option', 'done']);
+  });
+
+  it('without a model, uses the per-mode default and says which in the done line', async () => {
+    const calls = new FakeMessages([textEvents(payload(1)), textEvents(payload(1)), textEvents(payload(1))]);
+    const app = createApp({ claude: deps(calls), limiter: new RateLimiter(20), log: () => {} });
+    const { model: _, ...noModel } = req;
+    for (const mode of ['shape', 'fix-minimal', 'fix-rewrite'] as const) {
+      const done = (await readLines(await post(app, { ...noModel, mode, error: 'x' }))).find((l) => l.type === 'done');
+      expect(done).toMatchObject({ model: MODE_DEFAULT_MODELS[mode] });
+    }
+    expect(calls.calls.map((c) => c.params.model)).toEqual(['claude-haiku-5-5', 'claude-haiku-5-5', 'claude-sonnet-5-5']);
+    // A named model always wins.
+    const named = new FakeMessages([textEvents(payload(1))]);
+    await readLines(await post(createApp({ claude: deps(named), limiter: new RateLimiter(20), log: () => {} }), { ...req, mode: 'fix-rewrite', model: 'claude-haiku-5-5' }));
+    expect(named.calls[0].params.model).toBe('claude-haiku-5-5');
   });
 
   it('answers with an auth error line when there is no key', async () => {

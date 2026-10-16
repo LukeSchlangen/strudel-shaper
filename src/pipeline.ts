@@ -32,7 +32,7 @@ function addStats(a: RequestStats | undefined, s: ProviderStats, first: boolean)
   };
   return {
     ...base,
-    ...(first ? { firstMs: s.firstMs, lastMs: s.lastMs, totalMs: s.totalMs } : {}),
+    ...(first ? { firstMs: s.firstMs, lastMs: s.lastMs, totalMs: s.totalMs, ...(s.model ? { model: s.model } : {}) } : {}),
     calls: base.calls + 1,
     ...(tokens ? { tokens } : {}),
     ...(s.costUsd !== undefined ? { costUsd: (base.costUsd ?? 0) + s.costUsd } : {}),

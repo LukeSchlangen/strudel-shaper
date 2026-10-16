@@ -1,5 +1,5 @@
-import { ProviderError, type Option, type OptionRequest, type Provider, type ProviderHooks } from './provider';
-import { LineSplitter, type Effort, type RemoteLine, type RemoteRequest, type Strategy, type ThinkingSetting } from './remoteProtocol';
+import { ProviderError, type Mode, type Option, type OptionRequest, type Provider, type ProviderHooks } from './provider';
+import { LineSplitter, type Effort, type RemoteLine, type RemoteRequestBody, type Strategy, type ThinkingSetting } from './remoteProtocol';
 
 export interface RemoteSettings {
   effort?: Effort;
@@ -10,6 +10,11 @@ export interface RemoteSettings {
 export interface RemoteProviderOptions {
   provider: string; // the server-side adapter, e.g. "claude"
   model: string;
+  /**
+   * The model for a mode, when it isn't `model`. `null` leaves it to the proxy's default for that
+   * mode (server/providers/models.ts). Unset: `model` for every mode.
+   */
+  modelFor?: (mode: Mode) => string | null | undefined;
   endpoint?: string;
   /** The compact sound summary sent with each request (read when the request is made). */
   sounds?: () => string | undefined;
@@ -22,6 +27,18 @@ export interface RemoteProviderOptions {
  * option as its line arrives. Error lines become a ProviderError; stats go to `hooks.onStats`.
  * Nothing here is specific to one model or vendor.
  */
+/**
+ * `?fixModel=` / `?rewriteModel=` pick the model for ⌘J / ⌘⇧J; shape uses the selected one. Without
+ * a parameter a fix mode is left to the proxy's per-mode default (null).
+ */
+export function modelForMode(params: URLSearchParams, selected: string) {
+  return (mode: Mode): string | null => {
+    if (mode === 'fix-minimal') return params.get('fixModel') || null;
+    if (mode === 'fix-rewrite') return params.get('rewriteModel') || null;
+    return selected;
+  };
+}
+
 export class RemoteProvider implements Provider {
   readonly name: string;
   private seq = 0;
@@ -35,10 +52,11 @@ export class RemoteProvider implements Provider {
   }
 
   async *generateOptions(req: OptionRequest, signal: AbortSignal, hooks?: ProviderHooks): AsyncGenerator<Option> {
-    const body: RemoteRequest = {
+    const chosen = this.opts.modelFor ? this.opts.modelFor(req.mode) : this.opts.model;
+    const body: RemoteRequestBody = {
       ...req,
       provider: this.opts.provider,
-      model: this.opts.model,
+      ...(chosen ? { model: chosen } : {}),
       sounds: this.opts.sounds?.(),
       ...this.opts.settings?.(),
     };
@@ -74,7 +92,7 @@ export class RemoteProvider implements Provider {
       }
       if (line.type === 'option') return { id: `${this.opts.provider}-${++this.seq}`, label: line.label, code: line.code };
       if (line.type === 'done') {
-        hooks?.onStats?.({ ...line.timing, tokens: line.usage, costUsd: line.costUsd });
+        hooks?.onStats?.({ ...line.timing, tokens: line.usage, costUsd: line.costUsd, ...(line.model ? { model: line.model } : {}) });
       } else if (line.type === 'error') {
         batch.error ??= new ProviderError(line.kind, line.message);
       }

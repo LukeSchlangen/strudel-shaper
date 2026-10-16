@@ -48,6 +48,8 @@ export function changeSize(before: string, after: string): number {
 
 /**
  * Above this many changed characters, a minimal fix shows a `large change` badge: it rewrote more
- * than a fix should. Chosen from the fix eval (NOTES.md, milestone 5).
+ * than a fix should. From the fix eval (NOTES.md, milestone 5): 33 working minimal fixes changed
+ * 1–9 characters (p90 9), except swapped arguments (`s(0.4).gain("hh*8")` → `s("hh*8").gain(0.4)`)
+ * at 18; ⌘⇧J rewrites of the same code changed 30 at the median.
  */
-export const LARGE_CHANGE_CHARS = 12;
+export const LARGE_CHANGE_CHARS = 20;

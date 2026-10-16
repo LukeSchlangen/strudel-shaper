@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { RemoteLine, RemoteRequest } from '../src/remoteProtocol';
 import { mapError } from './errors';
 import { streamClaudeOptions, warmUp, type ClaudeDeps } from './providers/claude';
-import { DEFAULT_MODEL } from './providers/models';
+import { DEFAULT_MODEL, MODE_DEFAULT_MODELS } from './providers/models';
 import type { RateLimiter } from './rateLimit';
 
 export interface AppDeps {
@@ -50,6 +50,7 @@ export function createApp(deps: AppDeps) {
           if (value.type === 'done' || value.type === 'error') {
             log({
               model: req.model,
+              mode: req.mode,
               strategy: req.strategy ?? 'single',
               retry: !!req.feedback,
               ms: Math.round(performance.now() - started),
@@ -118,13 +119,14 @@ function parseRequest(body: unknown): RemoteRequest {
   if (b.selection.from < 0 || b.selection.to > b.buffer.length || b.selection.from > b.selection.to) {
     throw new Error('The selection is outside the buffer.');
   }
+  const mode = b.mode ?? 'shape';
   return {
     ...(b as RemoteRequest),
     provider: b.provider ?? 'claude',
-    model: b.model ?? DEFAULT_MODEL,
+    model: b.model || (MODE_DEFAULT_MODELS[mode] ?? DEFAULT_MODEL),
     instruction: b.instruction ?? '',
     cps: typeof b.cps === 'number' ? b.cps : 0.5,
-    mode: b.mode ?? 'shape',
+    mode,
   };
 }
 

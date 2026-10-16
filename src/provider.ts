@@ -37,6 +37,8 @@ export interface ProviderStats {
   totalMs?: number;
   tokens?: { input: number; output: number; cacheRead: number; cacheWrite: number };
   costUsd?: number;
+  /** The model that answered, when the provider chose it (e.g. the proxy's per-mode default). */
+  model?: string;
 }
 
 export interface ProviderHooks {

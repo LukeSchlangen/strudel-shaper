@@ -13,6 +13,7 @@ export type Strategy = 'single' | 'parallel';
 
 export interface RemoteRequest extends OptionRequest {
   provider: string;
+  /** Always set once the proxy has parsed the request; see RemoteRequestBody. */
   model: string;
   /** Compact summary of the loaded sound names (src/soundSummary.ts). */
   sounds?: string;
@@ -20,6 +21,9 @@ export interface RemoteRequest extends OptionRequest {
   thinking?: ThinkingSetting;
   strategy?: Strategy;
 }
+
+/** What the browser sends: without `model`, the proxy uses its default for the request's mode. */
+export type RemoteRequestBody = Omit<RemoteRequest, 'model'> & { model?: string };
 
 export interface Usage {
   input: number; // uncached input tokens
@@ -42,7 +46,7 @@ export type ErrorKind =
 
 export type RemoteLine =
   | { type: 'option'; label: string; code: string }
-  | { type: 'done'; timing: { firstMs?: number; lastMs?: number; totalMs: number }; usage: Usage; costUsd: number }
+  | { type: 'done'; timing: { firstMs?: number; lastMs?: number; totalMs: number }; usage: Usage; costUsd: number; model?: string }
   | { type: 'error'; kind: ErrorKind; message: string };
 
 export const emptyUsage = (): Usage => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });

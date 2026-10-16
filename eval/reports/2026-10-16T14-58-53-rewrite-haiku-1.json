@@ -1,0 +1,421 @@
+{
+ "label": "rewrite-haiku-1",
+ "createdAt": "2026-10-16T14:58:53.759Z",
+ "config": {
+  "provider": "claude",
+  "model": "claude-haiku-5-5",
+  "mode": "fix",
+  "warmup": false,
+  "only": [
+   "rewrite-bass-chords",
+   "rewrite-arp",
+   "rewrite-euclid",
+   "rewrite-chord-names"
+  ],
+  "label": "rewrite-haiku-1"
+ },
+ "soundsTokens": 1053,
+ "referenceTokens": 2438,
+ "results": [
+  {
+   "id": "rewrite-bass-chords",
+   "bufferId": "chords-sketch-bass",
+   "buffer": "setcps(0.45)\nstack(\n  chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano1\").room(0.3),\n  note(\"<Cm7 Fm7 Bb7 Ebmaj7>\").s(\"triangle\").gain(0.8),\n  s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\")\n)",
+   "mode": "fix-rewrite",
+   "selection": {
+    "from": 91,
+    "to": 143,
+    "text": "note(\"<Cm7 Fm7 Bb7 Ebmaj7>\").s(\"triangle\").gain(0.8)"
+   },
+   "instruction": "the bass should follow the chords",
+   "diagnosis": {
+    "kind": "ok",
+    "otherError": false
+   },
+   "originalBroken": false,
+   "firstArrivalMs": 1944.363958,
+   "firstCardMs": 2180.204916,
+   "lastSettledMs": 3501.920833,
+   "totalMs": 3502.189666,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1727.171042,
+    "lastMs": 2237.854542,
+    "totalMs": 2263.1868329999998,
+    "tokens": {
+     "input": 240,
+     "output": 239,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00022581
+   },
+   "retries": [
+    {
+     "slot": 1,
+     "reason": "query",
+     "message": "(P.chord || P).match is not a function",
+     "code": "note(\"<Cm7 Fm7 Bb7 Ebmaj7>\").rootNotes(2).s(\"triangle\").gain(0.8)"
+    }
+   ],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "bass follows chords",
+       "code": "note(\"<Cm7 Fm7 Bb7 Ebmaj7>\").rootNotes(2).s(\"triangle\").gain(0.8)",
+       "arrivedMs": 1944.363958,
+       "outcome": "retried: query"
+      },
+      {
+       "label": "bass follows chords",
+       "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").rootNotes(2).note().s(\"triangle\").gain(0.8)",
+       "arrivedMs": 3489.512208
+      }
+     ],
+     "label": "bass follows chords",
+     "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").rootNotes(2).note().s(\"triangle\").gain(0.8)",
+     "warnings": [],
+     "retried": true
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "root bass octave",
+       "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").rootNotes(3).note().s(\"triangle\").gain(0.8)",
+       "arrivedMs": 2165.387666
+      }
+     ],
+     "label": "root bass octave",
+     "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").rootNotes(3).note().s(\"triangle\").gain(0.8)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "walking root fifths",
+       "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").rootNotes(2).note().struct(\"x ~ x x\").s(\"triangle\").gain(0.8)",
+       "arrivedMs": 2453.740041
+      }
+     ],
+     "label": "walking root fifths",
+     "code": "chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").rootNotes(2).note().struct(\"x ~ x x\").s(\"triangle\").gain(0.8)",
+     "warnings": [],
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "rewrite-arp",
+   "bufferId": "melody-sketch-arp",
+   "buffer": "setcps(0.5)\nstack(\n  n([0, 2, 4, [5, 7]]).scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5),\n  note(\"d2 ~ a1 ~\").s(\"sawtooth\").lpf(500),\n  s(\"bd ~ sd ~, hh*8\")\n)",
+   "mode": "fix-rewrite",
+   "selection": {
+    "from": 21,
+    "to": 91,
+    "text": "n([0, 2, 4, [5, 7]]).scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)"
+   },
+   "instruction": "",
+   "diagnosis": {
+    "kind": "broken",
+    "stage": "silent",
+    "message": "It runs but makes no sound.",
+    "otherError": false
+   },
+   "originalBroken": false,
+   "firstArrivalMs": 1129.8214160000002,
+   "firstCardMs": 1145.2532910000004,
+   "lastSettledMs": 1502.962,
+   "totalMs": 1524.6617499999998,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1093.3342919999996,
+    "lastMs": 1457.5987079999995,
+    "totalMs": 1487.7122499999996,
+    "tokens": {
+     "input": 222,
+     "output": 220,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00021450999999999998
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "stack chord voicing",
+       "code": "n(\"<[0,2,4] [5,7]>\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+       "arrivedMs": 1129.8214160000002
+      }
+     ],
+     "label": "stack chord voicing",
+     "code": "n(\"<[0,2,4] [5,7]>\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+     "warnings": [],
+     "changeSize": 10,
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "melody with rests",
+       "code": "n(\"0 2 [4 5] 7\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+       "arrivedMs": 1317.569333
+      }
+     ],
+     "label": "melody with rests",
+     "code": "n(\"0 2 [4 5] 7\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+     "warnings": [],
+     "changeSize": 12,
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "arpeggiated d dorian",
+       "code": "n(\"0 [2 4] 5 [7 4]\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+       "arrivedMs": 1494.0730829999998
+      }
+     ],
+     "label": "arpeggiated d dorian",
+     "code": "n(\"0 [2 4] 5 [7 4]\").scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)",
+     "warnings": [],
+     "changeSize": 14,
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "rewrite-euclid",
+   "bufferId": "drums-sketch-euclid",
+   "buffer": "setcps(0.5)\nstack(\n  s(\"bd*4\"),\n  s(\"~ sd ~ sd\").bank(\"tr909\"),\n  s(\"hh*8\").gain(0.5),\n  s(\"cp\").euclid(3).gain(0.4)\n)",
+   "mode": "fix-rewrite",
+   "selection": {
+    "from": 89,
+    "to": 116,
+    "text": "s(\"cp\").euclid(3).gain(0.4)"
+   },
+   "instruction": "",
+   "diagnosis": {
+    "kind": "broken",
+    "stage": "eval",
+    "message": ".euclid() expects 2 inputs but got 1.",
+    "otherError": false
+   },
+   "originalBroken": true,
+   "firstArrivalMs": 1140.1807499999995,
+   "firstCardMs": 1149.114125,
+   "lastSettledMs": 1685.3842919999997,
+   "totalMs": 1799.669833,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1124.417875,
+    "lastMs": 1661.0632500000002,
+    "totalMs": 1783.6535830000003,
+    "tokens": {
+     "input": 201,
+     "output": 166,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00018541
+   },
+   "retries": [],
+   "drops": [],
+   "slots": [
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "euclid 3 of 8",
+       "code": "s(\"cp\").euclid(3, 8).gain(0.4)",
+       "arrivedMs": 1140.1807499999995
+      }
+     ],
+     "label": "euclid 3 of 8",
+     "code": "s(\"cp\").euclid(3, 8).gain(0.4)",
+     "warnings": [],
+     "changeSize": 3,
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "euclid 3 of 8",
+       "code": "s(\"cp\").bank(\"tr909\").euclid(3, 8).gain(0.4)",
+       "arrivedMs": 1437.3952499999996
+      }
+     ],
+     "label": "euclid 3 of 8",
+     "code": "s(\"cp\").bank(\"tr909\").euclid(3, 8).gain(0.4)",
+     "warnings": [],
+     "changeSize": 17,
+     "retried": false
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "euclid 3 of 16",
+       "code": "s(\"cp\").euclidRot(3, 8, 2).gain(0.4)",
+       "arrivedMs": 1676.7866669999994
+      }
+     ],
+     "label": "euclid 3 of 16",
+     "code": "s(\"cp\").euclidRot(3, 8, 2).gain(0.4)",
+     "warnings": [],
+     "changeSize": 9,
+     "retried": false
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  },
+  {
+   "id": "rewrite-chord-names",
+   "bufferId": "chords-sketch-names",
+   "buffer": "setcps(0.45)\nstack(\n  note(\"Cm7 Fm7\").voicing().s(\"gm_epiano1\").room(0.3),\n  note(\"<c2 f2 bb1 eb2>\").s(\"triangle\").gain(0.8),\n  s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\")\n)",
+   "mode": "fix-rewrite",
+   "selection": {
+    "from": 22,
+    "to": 73,
+    "text": "note(\"Cm7 Fm7\").voicing().s(\"gm_epiano1\").room(0.3)"
+   },
+   "instruction": "play these chords as stabs",
+   "diagnosis": {
+    "kind": "broken",
+    "stage": "silent",
+    "message": "It runs but makes no sound.",
+    "otherError": false
+   },
+   "originalBroken": false,
+   "firstArrivalMs": 1868.7312499999998,
+   "firstCardMs": 2211.9922909999996,
+   "lastSettledMs": 3730.498208,
+   "totalMs": 3730.637791,
+   "stats": {
+    "calls": 1,
+    "firstMs": 1851.9789170000004,
+    "lastMs": 2490.0249590000003,
+    "totalMs": 2515.4465839999993,
+    "tokens": {
+     "input": 216,
+     "output": 295,
+     "cacheRead": 8231,
+     "cacheWrite": 0
+    },
+    "costUsd": 0.00025141
+   },
+   "retries": [
+    {
+     "slot": 1,
+     "reason": "unfixed",
+     "message": "It runs but makes no sound.",
+     "code": "note(\"[~ Cm7] [~ Fm7]\").voicing().s(\"gm_epiano1\").room(0.3).struct(\"~ x ~ x\").decay(0.25).gain(0.7)"
+    },
+    {
+     "slot": 3,
+     "reason": "unfixed",
+     "message": "It runs but makes no sound.",
+     "code": "note(\"Cm7 Fm7\").voicing().s(\"gm_epiano1\").room(0.3).struct(\"x ~ x ~ ~ x ~ ~\").decay(0.3).gain(0.75)"
+    }
+   ],
+   "drops": [
+    {
+     "slot": 1,
+     "reason": "unfixed",
+     "message": "It runs but makes no sound.",
+     "code": "note(\"<Cm7 Fm7>*2\").struct(\"x ~ x ~\").voicing().s(\"gm_epiano1\").decay(0.2).sustain(0).room(0.3)"
+    },
+    {
+     "slot": 3,
+     "reason": "unfixed",
+     "message": "It runs but makes no sound.",
+     "code": "note(\"Cm7 Fm7\").voicing().s(\"gm_epiano1\").struct(\"x ~ ~ x ~ ~ ~ ~\").room(0.3).decay(0.25).gain(0.9)"
+    }
+   ],
+   "slots": [
+    {
+     "status": "dropped",
+     "attempts": [
+      {
+       "label": "chord stabs on off-beats",
+       "code": "note(\"[~ Cm7] [~ Fm7]\").voicing().s(\"gm_epiano1\").room(0.3).struct(\"~ x ~ x\").decay(0.25).gain(0.7)",
+       "arrivedMs": 1868.7312499999998,
+       "outcome": "retried: unfixed"
+      },
+      {
+       "label": "chord stabs",
+       "code": "note(\"<Cm7 Fm7>*2\").struct(\"x ~ x ~\").voicing().s(\"gm_epiano1\").decay(0.2).sustain(0).room(0.3)",
+       "arrivedMs": 2968.301708
+      }
+     ],
+     "drop": {
+      "reason": "unfixed",
+      "message": "It runs but makes no sound."
+     }
+    },
+    {
+     "status": "ready",
+     "attempts": [
+      {
+       "label": "short plucky stabs",
+       "code": "chord(\"<Cm7 Fm7>\").voicing().s(\"gm_epiano1\").room(0.3).struct(\"x ~ ~ x ~ x ~ ~\").release(0.1).gain(0.8)",
+       "arrivedMs": 2199.1259579999996
+      }
+     ],
+     "label": "short plucky stabs",
+     "code": "chord(\"<Cm7 Fm7>\").voicing().s(\"gm_epiano1\").room(0.3).struct(\"x ~ ~ x ~ x ~ ~\").release(0.1).gain(0.8)",
+     "warnings": [],
+     "changeSize": 58,
+     "retried": false
+    },
+    {
+     "status": "dropped",
+     "attempts": [
+      {
+       "label": "syncopated stab rhythm",
+       "code": "note(\"Cm7 Fm7\").voicing().s(\"gm_epiano1\").room(0.3).struct(\"x ~ x ~ ~ x ~ ~\").decay(0.3).gain(0.75)",
+       "arrivedMs": 2507.263291,
+       "outcome": "retried: unfixed"
+      },
+      {
+       "label": "chord stabs",
+       "code": "note(\"Cm7 Fm7\").voicing().s(\"gm_epiano1\").struct(\"x ~ ~ x ~ ~ ~ ~\").room(0.3).decay(0.25).gain(0.9)",
+       "arrivedMs": 3722.9387080000006
+      }
+     ],
+     "drop": {
+      "reason": "unfixed",
+      "message": "It runs but makes no sound."
+     }
+    },
+    {
+     "status": "empty",
+     "attempts": []
+    }
+   ]
+  }
+ ]
+}

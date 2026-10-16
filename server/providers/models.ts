@@ -33,6 +33,17 @@ export const MODELS: Record<string, ModelInfo> = {
 
 export const DEFAULT_MODEL = 'claude-haiku-5-5';
 
+/**
+ * The model for each mode when the browser doesn't name one (NOTES.md, milestone 5). Minimal fixes:
+ * Haiku made the same fixes as Sonnet at ~1/18 of the cost. Rewrites: Sonnet always returned 4
+ * working interpretations on the first try; Haiku 2–3, and once none that made sound.
+ */
+export const MODE_DEFAULT_MODELS: Record<string, string> = {
+  shape: DEFAULT_MODEL,
+  'fix-minimal': 'claude-haiku-5-5',
+  'fix-rewrite': 'claude-sonnet-5-5',
+};
+
 export function costUsd(model: ModelInfo, u: Usage): number {
   const p = model.prices;
   return (u.input * p.input + u.cacheWrite * p.cacheWrite5m + u.cacheRead * p.cacheRead + u.output * p.output) / 1e6;

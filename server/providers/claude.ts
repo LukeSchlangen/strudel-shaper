@@ -164,7 +164,7 @@ async function* oneCall(
   if (signal.aborted) return;
 
   const totalMs = now() - start;
-  yield { type: 'done', timing: { firstMs, lastMs, totalMs }, usage, costUsd: costUsd(info, usage) };
+  yield { type: 'done', timing: { firstMs, lastMs, totalMs }, usage, costUsd: costUsd(info, usage), model: info.id };
   if (stopReason === 'refusal') {
     yield { type: 'error', kind: 'refusal', message: 'The model declined this request.' };
   } else if (stopReason === 'max_tokens') {
@@ -226,7 +226,7 @@ async function* parallel(deps: ClaudeDeps, req: RemoteRequest, info: ModelInfo, 
   }
   await Promise.all(runs);
   if (signal.aborted) return;
-  yield { type: 'done', timing: { firstMs, lastMs, totalMs: now() - start }, usage, costUsd: costUsd(info, usage) };
+  yield { type: 'done', timing: { firstMs, lastMs, totalMs: now() - start }, usage, costUsd: costUsd(info, usage), model: info.id };
   // Partial success still shows the cards; the first error explains the missing ones.
   if (errors.length) yield errors[0];
 }

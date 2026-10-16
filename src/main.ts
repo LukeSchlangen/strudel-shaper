@@ -14,7 +14,7 @@ import { FAULT_KINDS, MockProvider, type FaultKind } from './mockProvider';
 import { STARTER_CODE } from './options';
 import { reasonLabel, runRequest } from './pipeline';
 import type { Mode, OptionRequest, Provider } from './provider';
-import { RemoteProvider, type RemoteSettings } from './remoteProvider';
+import { RemoteProvider, modelForMode, type RemoteSettings } from './remoteProvider';
 import { COMMON_DRUMS, summariseSounds } from './soundSummary';
 import { Quantizer } from './quantize';
 import { isRangeIntact, mapRange, splice, type Capture, type Edit, type Range } from './splice';
@@ -65,7 +65,8 @@ let soundSummary: string | undefined;
 function makeProvider(id: string): Provider {
   if (id === 'mock') return mockProvider;
   const [name, model] = id.split(':');
-  return new RemoteProvider({ provider: name, model, sounds: () => soundSummary, settings: remoteSettings });
+  // Shape uses the selected model; ⌘J / ⌘⇧J use ?fixModel= / ?rewriteModel=, else the proxy's per-mode default.
+  return new RemoteProvider({ provider: name, model, modelFor: modelForMode(query, model), sounds: () => soundSummary, settings: remoteSettings });
 }
 
 function initialChoice(): string {
@@ -700,7 +701,7 @@ function render() {
   const fixing = tray.fix?.error ? `${tray.mode === 'fix-minimal' ? 'fixing' : 'rewriting'}: ${tray.fix.error.slice(0, 80)}${tray.fix.errorAt?.line ? ` (line ${tray.fix.errorAt.line})` : ''}` : null;
   const status = [
     fixing,
-    `provider: ${times?.provider ?? providerLabel()}`,
+    `provider: ${times?.provider ?? providerLabel(tray.mode, stats?.model)}`,
     `first ${ms(times?.firstMs)}`,
     `last ${tray.done ? ms(times?.lastMs) : '…'}`,
     `${count((s) => s.status === 'ready')} ok · ${count((s) => !!s.retried)} retried · ${count((s) => s.status === 'dropped')} dropped`,
@@ -723,7 +724,13 @@ function render() {
   statusEl.textContent = `${KEYS_HINT} · ${swap.replace('(T)', '(Alt+T)')}`;
 }
 
-function providerLabel() {
+/** The provider, and for a remote one the model that answered (or will: a fix mode may use another). */
+function providerLabel(mode: Mode = 'shape', answered?: string) {
+  if (provider instanceof RemoteProvider) {
+    const name = provider.name.split(' · ')[0];
+    if (answered) return `${name} · ${answered.replace(/^claude-/, '')}`;
+    if (mode !== 'shape') return `${name} · ${modelForMode(query, provider.model)(mode)?.replace(/^claude-/, '') ?? `${mode} default`}`;
+  }
   if (!(provider instanceof MockProvider) || provider.faultRate === 0) return provider.name;
   return `${provider.name} (faults ${Math.round(provider.faultRate * 100)}%${provider.faultKind ? ` ${provider.faultKind}` : ''}${provider.retryFails ? ', retries fail' : ''})`;
 }
