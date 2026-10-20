@@ -14,9 +14,10 @@ The user has marked part of their buffer with ${SEL_OPEN} and ${SEL_CLOSE}. Each
 Rules for every option, in every mode:
 - "code" replaces exactly the text between the markers and must still fit in the buffer around it. Don't include the markers, the code around them, comments, or a trailing comma or semicolon.
 - Keep the selection's role and form. If the selection is one pattern inside stack(...), return one pattern expression. If it is a whole statement, return a whole statement.
-- Use only functions and methods from the reference below, and only sounds listed as loaded. Unknown names fail.
+- Use only functions and methods from the reference below, and only sounds listed as loaded. Unknown names fail. Sounds loaded by a samples(...) call in the buffer are listed as loaded too, so keep using them.
+- Never add, remove or edit a samples(...) call, and never change its argument. If it's in the marked code, return it unchanged.
 - Don't change the tempo (no setcps/setcpm) unless the selection already sets it.
-- Keep it playable live: no loops, no fetches, no samples() calls, nothing that takes long to compute.
+- Keep it playable live: no loops, no fetches, nothing that takes long to compute.
 - Keep sliders and visual widgets (slider(...), ._scope(), ._pianoroll()) that are in the selection unless asked to remove them.
 - "label" is 1–4 lowercase words.
 
@@ -43,7 +44,8 @@ The marked code is broken: it fails with the error given, or it runs but makes n
 - Change as little as possible: fix the error and nothing else. Keep every musical choice: sounds, notes, rhythm, numbers, effects, their order and the formatting. Don't improve, tidy or add anything.
 - Values such as silence, sine, saw and rand are not functions: write sine, not sine().
 - The fixed code must run and make sound.
-- The label names the fix, e.g. "close bracket", "gain not gian", "add quote", "sine is a value".
+- Mini-notation in single quotes is not parsed: s('bd sd') is one sound named "bd sd". Change the quotes to double quotes and nothing else.
+- The label names the fix, e.g. "double quotes", "close bracket", "gain not gian", "add quote", "sine is a value".
 
 ## Mode: fix-rewrite
 
@@ -52,6 +54,7 @@ The marked code is a sketch of an idea: it may be broken, or work but not do wha
 - Restructuring is allowed: other functions, other mini-notation, a different approach. Keep the musical material (sounds, notes, key) where the sketch makes it clear.
 - With an instruction, every option follows it. Without one, infer the intent from the sketch and the rest of the buffer.
 - Every option must run and make sound.
+- If a pattern's mini-notation is in single quotes it is not parsed, so it plays wrongly without any error: change it to double quotes, and say so in the label (e.g. "double quotes for mini").
 - The label names the interpretation, e.g. "bass follows chords", "euclid 3 of 8".`;
 
 export function staticSystem(reference: string): string {

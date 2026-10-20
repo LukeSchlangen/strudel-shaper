@@ -55,3 +55,15 @@ export function summariseSounds(names: string[]): string {
   if (families.length) lines.push(`Sampled instruments with articulations (e.g. ${otherBanked[0]}): ${families.map((f) => `${f}_*`).join(' ')}`);
   return lines.join('\n');
 }
+
+/**
+ * The sounds that `samples(...)` calls in the user's buffer added to the soundMap since prebake,
+ * as one prompt section. A sample folder's names (`kick`, `snare`, …) aren't guessable and each
+ * holds several variants (`kick:3`), so the model gets the names and the variant counts.
+ */
+export function summariseLoaded(entries: { name: string; count?: number }[], max = 120): string {
+  if (!entries.length) return '';
+  const shown = entries.slice(0, max).map(({ name, count }) => (count && count > 1 ? `${name}(${count})` : name));
+  const more = entries.length > max ? ` … and ${entries.length - max} more` : '';
+  return `Loaded by the buffer's samples() calls, also valid (a number in brackets is how many variants; pick one with "name:2"): ${shown.join(' ')}${more}`;
+}

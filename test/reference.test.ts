@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { CATEGORIES, VALUES, buildReference, parseDocs } from '../scripts/build-reference';
 import { Sandbox } from '../src/sandbox';
-import { COMMON_DRUMS, summariseSounds } from '../src/soundSummary';
+import { COMMON_DRUMS, summariseLoaded, summariseSounds } from '../src/soundSummary';
 import { soundKey } from '../src/sandbox';
 
 const read = (p: string) => readFileSync(fileURLToPath(new URL(`../${p}`, import.meta.url)), 'utf8');
@@ -103,5 +103,17 @@ describe('summariseSounds', () => {
       return ![...words].some((w) => w === `${bank}_*` || (w.endsWith(bank) && /^[a-z0-9]+$/.test(w)));
     });
     expect(missing).toEqual([]);
+  });
+});
+
+describe('summariseLoaded', () => {
+  it('is empty when the buffer loaded nothing', () => {
+    expect(summariseLoaded([])).toBe('');
+  });
+
+  it('lists names with variant counts and caps the list', () => {
+    expect(summariseLoaded([{ name: 'kick', count: 10 }, { name: 'vox' }, { name: 'oh', count: 1 }])).toMatch(/: kick\(10\) vox oh$/);
+    const many = Array.from({ length: 5 }, (_, i) => ({ name: `s${i}` }));
+    expect(summariseLoaded(many, 2)).toMatch(/: s0 s1 … and 3 more$/);
   });
 });

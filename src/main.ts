@@ -2,10 +2,12 @@ import '@strudel/repl/repl-component.mjs';
 import { getAudioContext, soundMap } from '@strudel/webaudio';
 import { Pattern, silence, strudelScope } from '@strudel/core';
 import { addWidget, setSliderWidgets, sliderValues } from '@strudel/codemirror';
+import { isolateHistory } from '@codemirror/commands';
 import { EditorView } from '@codemirror/view';
 import { StateEffect } from '@codemirror/state';
 import { captureRange } from './capture';
 import { commitSpec } from './commit';
+import { FormatError, formatCode, mapOffset } from './format';
 import { LARGE_CHANGE_CHARS, diffSegments, type DiffGranularity } from './diff';
 import { diagnoseFix, noRequestReason, trayFix, type TrayFix } from './fixTarget';
 import { InstructionBox } from './instructionBox';
@@ -15,7 +17,7 @@ import { STARTER_CODE } from './options';
 import { reasonLabel, runRequest } from './pipeline';
 import type { Mode, OptionRequest, Provider } from './provider';
 import { RemoteProvider, modelForMode, type RemoteSettings } from './remoteProvider';
-import { COMMON_DRUMS, summariseSounds } from './soundSummary';
+import { COMMON_DRUMS, summariseLoaded, summariseSounds } from './soundSummary';
 import { Quantizer } from './quantize';
 import { isRangeIntact, mapRange, splice, type Capture, type Edit, type Range } from './splice';
 import { initialState, slotCount, transition, type Effect, type Slot, type SlotCard, type TrayEvent, type TrayState } from './trayMachine';
@@ -32,6 +34,7 @@ document.getElementById('editor-wrap')!.append(host);
 const mirror = host.editor; // StrudelMirror (@strudel/codemirror/codemirror.mjs)
 const view: EditorView = mirror.editor; // CodeMirror EditorView
 const scheduler = mirror.repl.scheduler; // Cyclist (@strudel/core/cyclist.mjs)
+mirror.setLineWrappingEnabled(true); // long chains wrap instead of scrolling sideways
 const quantizer = new Quantizer(scheduler);
 
 const statusEl = document.getElementById('status')!;
@@ -60,13 +63,29 @@ const remoteSettings = (): RemoteSettings => ({
   ...(query.get('strategy') ? { strategy: query.get('strategy') as RemoteSettings['strategy'] } : {}),
 });
 /** The loaded sounds, summarised once prebake has filled the soundMap. */
-let soundSummary: string | undefined;
+let baseSoundSummary: string | undefined;
+/** The sound names present after prebake; anything added later came from the user's samples() calls. */
+let baselineSounds = new Set<string>();
+/** The prebaked summary plus whatever the buffer's samples() calls have loaded so far (it changes after an evaluation). */
+const soundSummary = (): string | undefined => {
+  if (baseSoundSummary === undefined) return undefined;
+  const loaded = soundMap.get();
+  const entries = Object.keys(loaded)
+    .filter((name) => !baselineSounds.has(name))
+    .sort()
+    .map((name) => {
+      const bank = loaded[name]?.data?.samples;
+      return { name, count: Array.isArray(bank) ? bank.length : undefined };
+    });
+  const extra = summariseLoaded(entries);
+  return extra ? `${baseSoundSummary}\n${extra}` : baseSoundSummary;
+};
 
 function makeProvider(id: string): Provider {
   if (id === 'mock') return mockProvider;
   const [name, model] = id.split(':');
   // Shape uses the selected model; ⌘J / ⌘⇧J use ?fixModel= / ?rewriteModel=, else the proxy's per-mode default.
-  return new RemoteProvider({ provider: name, model, modelFor: modelForMode(query, model), sounds: () => soundSummary, settings: remoteSettings });
+  return new RemoteProvider({ provider: name, model, modelFor: modelForMode(query, model), sounds: soundSummary, settings: remoteSettings });
 }
 
 function initialChoice(): string {
@@ -129,7 +148,7 @@ async function warmUp() {
   const res = await fetch('/api/warmup', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ model, sounds: soundSummary, ...remoteSettings() }),
+    body: JSON.stringify({ model, sounds: soundSummary(), ...remoteSettings() }),
   })
     .then((r) => r.json())
     .catch((err) => ({ ok: false, message: String(err) }));
@@ -178,7 +197,8 @@ Promise.resolve(mirror.prebaked)
   .catch((err: unknown) => console.error('[shaper] prebake failed', err))
   .then(() => {
     backend.init(liveScope());
-    soundSummary = summariseSounds(Object.keys(soundMap.get()));
+    baselineSounds = new Set(Object.keys(soundMap.get()));
+    baseSoundSummary = summariseSounds([...baselineSounds]);
   });
 
 /** A few loaded drum names for unknown-sample feedback. */
@@ -589,10 +609,54 @@ function toggleSwapTiming() {
   render();
 }
 
+/** ⌘/Ctrl+⇧F: reformat the whole buffer as one undoable edit. Strings and comments are never touched. */
+async function formatBuffer() {
+  if (state.kind === 'tray') {
+    statusEl.textContent = 'Close the options (Esc) before formatting.';
+    return;
+  }
+  const before = view.state.doc.toString();
+  try {
+    const after = await formatCode(before);
+    if (view.state.doc.toString() !== before) return; // edited while Prettier loaded
+    if (after === before) {
+      statusEl.textContent = 'Already formatted.';
+      return;
+    }
+    // Replace only the span that differs, so the scroll position and undo stay local.
+    let from = 0;
+    while (from < before.length && before[from] === after[from]) from++;
+    let endB = before.length;
+    let endA = after.length;
+    while (endB > from && endA > from && before[endB - 1] === after[endA - 1]) {
+      endB--;
+      endA--;
+    }
+    const head = mapOffset(before, view.state.selection.main.head, after);
+    view.dispatch({
+      changes: { from, to: endB, insert: after.slice(from, endA) },
+      selection: { anchor: head },
+      annotations: isolateHistory.of('full'),
+      userEvent: 'input.shaper.format',
+      scrollIntoView: true,
+    });
+    statusEl.textContent = 'Formatted. ⌘/Ctrl+Z undoes it.';
+  } catch (err) {
+    statusEl.textContent =
+      err instanceof FormatError ? `Can't format yet: ${err.message}` : `Couldn't format: ${String((err as Error)?.message ?? err)}`;
+  }
+}
+
 window.addEventListener(
   'keydown',
   (e) => {
     const mod = e.metaKey || e.ctrlKey;
+    if (mod && !e.altKey && e.shiftKey && e.code === 'KeyF') {
+      e.preventDefault();
+      e.stopPropagation();
+      void formatBuffer();
+      return;
+    }
     // Capture phase, so CodeMirror's own Ctrl-K (emacs deleteToLineEnd on macOS) never sees it.
     if (mod && !e.altKey && e.code === 'KeyK') {
       e.preventDefault();
@@ -659,7 +723,7 @@ trayEl.addEventListener('click', (e) => {
 
 // --- Render -----------------------------------------------------------------------------------
 
-const KEYS_HINT = '⌘/Ctrl+K shape · ⌘/Ctrl+J fix · ⌘/Ctrl+⇧J rewrite · Alt+P provider';
+const KEYS_HINT = '⌘/Ctrl+K shape · ⌘/Ctrl+J fix · ⌘/Ctrl+⇧J rewrite · ⌘/Ctrl+⇧F format · Alt+P provider';
 
 function render() {
   const swap = `swap: ${quantizer.mode} (T)`;

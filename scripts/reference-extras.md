@@ -1,4 +1,5 @@
 ## Mini-notation (inside "…" strings)
+- Mini-notation only works in double quotes or backticks. `s('bd sd')` (single quotes) is one sound named "bd sd", silent or wrong, with no error: write `s("bd sd")`.
 - Spaces divide one cycle into equal steps: `"bd sd bd sd"`. `~` or `-` is a rest.
 - `[a b]` fits a group into one step: `"bd [sd sd]"`. `,` inside brackets plays layers at once: `"[bd, hh hh]"`.
 - `<a b c>` plays one item per cycle, in turn: `"<c e g>"`. Combine: `"bd <sd [sd sd]>"`.
@@ -8,6 +9,9 @@
 - `a:2` picks sample number 2 of a sound (`"hh:3"`), same as `.n(2)`.
 - Notes: `note("c3 eb3 g3")`, numbers are MIDI (`note("48 51")`), `n("0 2 4").scale("C:minor")` uses scale degrees.
 - `{a b c}%4` plays a sequence at 4 steps per cycle (polymeter).
+
+## External samples
+`samples('github:user/repo/branch')` in the buffer loads sounds named by the keys of the repo's `strudel.json` (`s("kick:3")` picks variant 3). Use the names listed as loaded, and leave `samples(...)` lines alone.
 
 ## Writing good variations
 - A drum line stays a drum line: change the rhythm, the sounds (`.bank("tr808")`), the dynamics (`.gain("[.8 .4]*4")`) or add motion (`.sometimesBy(.3, x => x.speed(2))`).

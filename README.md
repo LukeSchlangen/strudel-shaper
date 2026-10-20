@@ -1,6 +1,6 @@
 # Strudel Shaper
 
-A browser-based [Strudel](https://strudel.cc) live-coding editor where you audition code variations on the running clock. This repo is at **Milestone 1**: the audition spike, with hard-coded options and no AI.
+A browser-based [Strudel](https://strudel.cc) live-coding editor where you audition code variations on the running clock.
 
 ## Run
 

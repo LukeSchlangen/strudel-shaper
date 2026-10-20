@@ -50,7 +50,7 @@ describe('eval fixtures: fix', () => {
     const rewrite = fix.filter((f) => f.mode === 'fix-rewrite');
     expect(minimal.length).toBeGreaterThanOrEqual(10);
     expect(minimal.some((f) => f.selection === null) && minimal.some((f) => f.selection !== null)).toBe(true);
-    expect(new Set(minimal.map((f) => f.expect))).toEqual(new Set(['eval', 'syntax', 'query', 'silent']));
+    expect(new Set(minimal.map((f) => f.expect))).toEqual(new Set(['eval', 'syntax', 'query', 'silent', 'unknown-sample']));
     expect(minimal.some((f) => f.otherError)).toBe(true);
     expect(rewrite.length).toBeGreaterThanOrEqual(2);
     expect(rewrite.some((f) => f.instruction) && rewrite.some((f) => !f.instruction)).toBe(true);
