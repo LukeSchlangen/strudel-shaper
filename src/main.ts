@@ -65,6 +65,9 @@ const CHOICES: Choice[] = [
 ];
 
 const query = new URLSearchParams(location.search);
+if (query.get('key')) {
+  localStorage.setItem('shaper_access_key', query.get('key')!.trim());
+}
 /** `?effort=low|medium|high&thinking=off|adaptive&strategy=single|parallel`: leave unset for the server's defaults. */
 const remoteSettings = (): RemoteSettings => ({
   ...(query.get('effort') ? { effort: query.get('effort') as RemoteSettings['effort'] } : {}),
@@ -94,7 +97,14 @@ function makeProvider(id: string): Provider {
   if (id === 'mock') return mockProvider;
   const [name, model] = id.split(':');
   // Shape uses the selected model; ⌘J / ⌘⇧J use ?fixModel= / ?rewriteModel=, else the proxy's per-mode default.
-  return new RemoteProvider({ provider: name, model, modelFor: modelForMode(query, model), sounds: soundSummary, settings: remoteSettings });
+  return new RemoteProvider({
+    provider: name,
+    model,
+    modelFor: modelForMode(query, model),
+    sounds: soundSummary,
+    settings: remoteSettings,
+    accessKey: () => localStorage.getItem('shaper_access_key')?.trim() || undefined,
+  });
 }
 
 function initialChoice(): string {
@@ -124,11 +134,50 @@ function renderChoices() {
 
 renderChoices();
 
+const accessKeyBtn = document.getElementById('access-key-btn') as HTMLButtonElement | null;
+let serverRequiresKey = false;
+
+function updateKeyButton() {
+  if (!accessKeyBtn) return;
+  const key = localStorage.getItem('shaper_access_key');
+  if (key) {
+    accessKeyBtn.textContent = '🔒 Key Set';
+    accessKeyBtn.title = 'Site Access Key configured (click to change or remove)';
+  } else if (serverRequiresKey) {
+    accessKeyBtn.textContent = '🔑 Key Required';
+    accessKeyBtn.title = 'Site Access Key is required by the server (click to enter)';
+  } else {
+    accessKeyBtn.textContent = '🔑 Key';
+    accessKeyBtn.title = 'Configure Site Access Key';
+  }
+}
+updateKeyButton();
+
+accessKeyBtn?.addEventListener('click', () => {
+  const current = localStorage.getItem('shaper_access_key') ?? '';
+  const entered = window.prompt('Enter site access key / password to enable AI models:', current);
+  if (entered !== null) {
+    if (entered.trim()) {
+      localStorage.setItem('shaper_access_key', entered.trim());
+    } else {
+      localStorage.removeItem('shaper_access_key');
+    }
+    updateKeyButton();
+    warmedUp = false;
+    if (gestured) void warmUp();
+  }
+});
+
 // Check which models are enabled by the deployed backend environment variables
 fetch('/api/models')
   .then((r) => (r.ok ? r.json() : null))
   .then((data) => {
-    if (!data?.providers) return;
+    if (!data) return;
+    if (data.requiresAccessKey) {
+      serverRequiresKey = true;
+      updateKeyButton();
+    }
+    if (!data.providers) return;
     for (const choice of CHOICES) {
       if (choice.id === 'mock') continue;
       const [prov] = choice.id.split(':');
@@ -182,9 +231,12 @@ async function warmUp() {
   warmedUp = true;
   const model = provider.model;
   await Promise.resolve(mirror.prebaked).catch(() => {});
+  const accessKey = localStorage.getItem('shaper_access_key')?.trim();
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (accessKey) headers['x-access-key'] = accessKey;
   const res = await fetch('/api/warmup', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers,
     body: JSON.stringify({ model, sounds: soundSummary(), ...remoteSettings() }),
   })
     .then((r) => r.json())

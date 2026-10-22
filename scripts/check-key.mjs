@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
 const geminiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)?.trim();
+const appAccessKey = process.env.APP_ACCESS_KEY?.trim();
 execSync('npx vite build', { stdio: 'inherit' });
 const files = [];
 const walk = (d) => readdirSync(d).forEach((f) => (statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : files.push(join(d, f))));
@@ -15,6 +16,7 @@ const hits = files.filter((f) => {
   return (
     (anthropicKey && text.includes(anthropicKey)) ||
     (geminiKey && text.includes(geminiKey)) ||
+    (appAccessKey && appAccessKey.length >= 6 && text.includes(appAccessKey)) ||
     /sk-ant-[A-Za-z0-9_-]{10,}/.test(text) ||
     /AIza[0-9A-Za-z-_]{35}/.test(text) ||
     text.includes('ANTHROPIC_API_KEY') ||

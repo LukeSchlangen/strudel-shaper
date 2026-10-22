@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createApp, MAX_BUFFER_CHARS, MAX_INSTRUCTION_CHARS, MAX_PAYLOAD_BYTES, MAX_SELECTION_CHARS, MAX_SOUNDS_CHARS } from '../server/app';
+import { createApp, isAuthorizedKey, MAX_BUFFER_CHARS, MAX_INSTRUCTION_CHARS, MAX_PAYLOAD_BYTES, MAX_SELECTION_CHARS, MAX_SOUNDS_CHARS } from '../server/app';
 import { cleanOption, MAX_OPTION_CHARS } from '../server/providers/postprocess';
 import { buildGeminiParams } from '../server/providers/gemini';
 import { buildParams } from '../server/providers/claude';
 import { RateLimiter } from '../server/rateLimit';
-import { FakeGemini } from './fakeGemini';
+import { FakeGemini, geminiTextChunks } from './fakeGemini';
 import { FakeMessages } from './fakeAnthropic';
 import type { RemoteRequest } from '../src/remoteProtocol';
 
@@ -142,5 +142,86 @@ describe('Response token and size bounds', () => {
 
     const bloated = cleanOption({ label: 'test', code: 's("bd").repeat(999).' + 'x'.repeat(MAX_OPTION_CHARS) });
     expect(bloated).toBeNull();
+  });
+});
+
+describe('Site access key authentication', () => {
+  it('validates timing-safe key equality', () => {
+    expect(isAuthorizedKey(null, undefined)).toBe(true);
+    expect(isAuthorizedKey(undefined, 'anything')).toBe(true);
+    expect(isAuthorizedKey('secret123', undefined)).toBe(false);
+    expect(isAuthorizedKey('secret123', 'wrong')).toBe(false);
+    expect(isAuthorizedKey('secret123', 'secret1234')).toBe(false);
+    expect(isAuthorizedKey('secret123', 'secret123')).toBe(true);
+  });
+
+  const protectedApp = createApp({
+    claude: null,
+    gemini: { client: new FakeGemini([geminiTextChunks('```strudel\ns("hh*4")\n```')]), reference: 'REF', maxTokens: 1024 },
+    accessKey: 'shaper-secure-pwd',
+    limiter: new RateLimiter(100, 100),
+  });
+
+  it('reports requiresAccessKey in /api/models', async () => {
+    const res = await protectedApp.request('/api/models');
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.requiresAccessKey).toBe(true);
+  });
+
+  it('rejects /api/options without access key', async () => {
+    const res = await protectedApp.request('/api/options', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(baseReq),
+    });
+    expect(res.status).toBe(401);
+    const data = await res.json();
+    expect(data.kind).toBe('auth');
+    expect(data.message).toContain('access key');
+  });
+
+  it('rejects /api/options with invalid access key', async () => {
+    const res = await protectedApp.request('/api/options', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-access-key': 'wrong-password' },
+      body: JSON.stringify(baseReq),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('allows /api/options with matching x-access-key header', async () => {
+    const res = await protectedApp.request('/api/options', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-access-key': 'shaper-secure-pwd' },
+      body: JSON.stringify(baseReq),
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('application/x-ndjson');
+  });
+
+  it('allows /api/options with matching Bearer token', async () => {
+    const res = await protectedApp.request('/api/options', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: 'Bearer shaper-secure-pwd' },
+      body: JSON.stringify(baseReq),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it('enforces access key on /api/warmup', async () => {
+    const denied = await protectedApp.request('/api/warmup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'gemini-3.8-flash' }),
+    });
+    expect(denied.status).toBe(401);
+
+    const allowed = await protectedApp.request('/api/warmup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-access-key': 'shaper-secure-pwd' },
+      body: JSON.stringify({ model: 'gemini-3.8-flash' }),
+    });
+    expect(allowed.status).toBe(200);
   });
 });

@@ -19,6 +19,7 @@ export interface RemoteProviderOptions {
   /** The compact sound summary sent with each request (read when the request is made). */
   sounds?: () => string | undefined;
   settings?: () => RemoteSettings;
+  accessKey?: () => string | undefined;
   fetch?: typeof fetch;
 }
 
@@ -61,11 +62,14 @@ export class RemoteProvider implements Provider {
       ...this.opts.settings?.(),
     };
     const doFetch = this.opts.fetch ?? fetch;
+    const key = this.opts.accessKey?.();
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (key) headers['x-access-key'] = key;
     let res: Response;
     try {
       res = await doFetch(this.opts.endpoint ?? '/api/options', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers,
         body: JSON.stringify(body),
         signal,
       });

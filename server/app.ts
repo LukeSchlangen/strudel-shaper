@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { Hono } from 'hono';
 import type { RemoteLine, RemoteRequest } from '../src/remoteProtocol';
 import { mapError } from './errors';
@@ -10,6 +11,8 @@ export interface AppDeps {
   /** Null when there's no API key: requests then get an `auth` error line. */
   claude: Omit<ClaudeDeps, 'beforeCall'> | null;
   gemini?: Omit<GeminiDeps, 'beforeCall'> | null;
+  /** Optional secret password required to make model requests (APP_ACCESS_KEY). */
+  accessKey?: string | null;
   limiter: RateLimiter;
   log?: (entry: Record<string, unknown>) => void;
 }
@@ -38,6 +41,15 @@ export function isAllowedOrigin(c: { req: { header: (name: string) => string | u
   }
 }
 
+export function isAuthorizedKey(expectedKey: string | null | undefined, providedKey: string | undefined): boolean {
+  if (!expectedKey) return true; // No key configured: public access
+  if (!providedKey) return false;
+  const exp = Buffer.from(expectedKey);
+  const prov = Buffer.from(providedKey);
+  if (exp.length !== prov.length) return false;
+  return timingSafeEqual(exp, prov);
+}
+
 const encoder = new TextEncoder();
 const ndjson = (line: RemoteLine) => encoder.encode(JSON.stringify(line) + '\n');
 
@@ -53,6 +65,7 @@ export function createApp(deps: AppDeps) {
 
   app.get('/api/models', (c) => {
     return c.json({
+      requiresAccessKey: !!deps.accessKey,
       providers: {
         claude: !!deps.claude,
         gemini: !!deps.gemini,
@@ -71,6 +84,11 @@ export function createApp(deps: AppDeps) {
   app.post('/api/options', async (c) => {
     if (!isAllowedOrigin(c)) {
       return c.json({ type: 'error', kind: 'bad-request', message: 'Cross-origin requests are not allowed.' }, 403);
+    }
+
+    const clientAccessKey = c.req.header('x-access-key') ?? c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
+    if (!isAuthorizedKey(deps.accessKey, clientAccessKey)) {
+      return c.json({ type: 'error', kind: 'auth', message: 'Invalid or missing site access key. Click 🔑 Key in the header to enter it.' }, 401);
     }
 
     const contentLength = Number(c.req.header('content-length') ?? 0);
@@ -139,6 +157,11 @@ export function createApp(deps: AppDeps) {
   app.post('/api/warmup', async (c) => {
     if (!isAllowedOrigin(c)) {
       return c.json({ ok: false, message: 'Cross-origin requests are not allowed.' }, 403);
+    }
+
+    const clientAccessKey = c.req.header('x-access-key') ?? c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
+    if (!isAuthorizedKey(deps.accessKey, clientAccessKey)) {
+      return c.json({ ok: false, message: 'Invalid or missing site access key.' }, 401);
     }
 
     const clientIp = getClientIp(c);
