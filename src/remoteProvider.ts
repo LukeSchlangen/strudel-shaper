@@ -44,7 +44,7 @@ export class RemoteProvider implements Provider {
   private seq = 0;
 
   constructor(private readonly opts: RemoteProviderOptions) {
-    this.name = `${opts.provider} · ${opts.model.replace(/^claude-/, '')}`;
+    this.name = `${opts.provider} · ${opts.model.replace(/^(claude|gemini)-/, '')}`;
   }
 
   get model() {

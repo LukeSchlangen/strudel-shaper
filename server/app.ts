@@ -1,13 +1,15 @@
 import { Hono } from 'hono';
 import type { RemoteLine, RemoteRequest } from '../src/remoteProtocol';
 import { mapError } from './errors';
-import { streamClaudeOptions, warmUp, type ClaudeDeps } from './providers/claude';
-import { DEFAULT_MODEL, MODE_DEFAULT_MODELS } from './providers/models';
+import { streamClaudeOptions, warmUp as warmUpClaude, type ClaudeDeps } from './providers/claude';
+import { streamGeminiOptions, warmUp as warmUpGemini, type GeminiDeps } from './providers/gemini';
+import { DEFAULT_MODEL, defaultModelFor } from './providers/models';
 import type { RateLimiter } from './rateLimit';
 
 export interface AppDeps {
   /** Null when there's no API key: requests then get an `auth` error line. */
   claude: Omit<ClaudeDeps, 'beforeCall'> | null;
+  gemini?: Omit<GeminiDeps, 'beforeCall'> | null;
   limiter: RateLimiter;
   log?: (entry: Record<string, unknown>) => void;
 }
@@ -23,6 +25,22 @@ const ndjson = (line: RemoteLine) => encoder.encode(JSON.stringify(line) + '\n')
 export function createApp(deps: AppDeps) {
   const app = new Hono();
   const log = deps.log ?? ((entry) => console.log('[proxy]', JSON.stringify(entry)));
+
+  app.get('/api/models', (c) => {
+    return c.json({
+      providers: {
+        claude: !!deps.claude,
+        gemini: !!deps.gemini,
+      },
+      models: [
+        { id: 'mock', provider: 'mock', label: 'mock', enabled: true },
+        { id: 'claude:claude-haiku-5-5', provider: 'claude', model: 'claude-haiku-5-5', label: 'claude · haiku 5.5', enabled: !!deps.claude },
+        { id: 'claude:claude-sonnet-5-5', provider: 'claude', model: 'claude-sonnet-5-5', label: 'claude · sonnet 5.5', enabled: !!deps.claude },
+        { id: 'gemini:gemini-2.5-flash', provider: 'gemini', model: 'gemini-2.5-flash', label: 'gemini · 2.5 flash', enabled: !!deps.gemini },
+        { id: 'gemini:gemini-2.5-pro', provider: 'gemini', model: 'gemini-2.5-pro', label: 'gemini · 2.5 pro', enabled: !!deps.gemini },
+      ],
+    });
+  });
 
   app.post('/api/options', async (c) => {
     let req: RemoteRequest;
@@ -82,16 +100,32 @@ export function createApp(deps: AppDeps) {
   });
 
   app.post('/api/warmup', async (c) => {
-    if (!deps.claude) return c.json({ ok: false, message: 'No API key configured.' });
     const body = (await c.req.json().catch(() => ({}))) as Partial<RemoteRequest>;
+    const provider = body.provider ?? (body.model?.startsWith('gemini') ? 'gemini' : 'claude');
     const started = performance.now();
-    const { done, error } = await warmUp(
+
+    if (provider === 'gemini') {
+      if (!deps.gemini) return c.json({ ok: false, message: 'No Gemini API key configured.' });
+      const model = body.model ?? 'gemini-2.5-flash';
+      const { done, error } = await warmUpGemini(
+        { ...deps.gemini, beforeCall: () => deps.limiter.take() },
+        { model, sounds: body.sounds, effort: body.effort, thinking: body.thinking },
+        c.req.raw.signal,
+      );
+      const ms = Math.round(performance.now() - started);
+      log({ warmup: true, provider: 'gemini', model, ms, usage: done?.usage, error: error?.kind });
+      return c.json({ ok: !error, ms, usage: done?.usage, message: error?.message });
+    }
+
+    if (!deps.claude) return c.json({ ok: false, message: 'No Claude API key configured.' });
+    const model = body.model ?? DEFAULT_MODEL;
+    const { done, error } = await warmUpClaude(
       { ...deps.claude, beforeCall: () => deps.limiter.take() },
-      { model: body.model ?? DEFAULT_MODEL, sounds: body.sounds, effort: body.effort, thinking: body.thinking },
+      { model, sounds: body.sounds, effort: body.effort, thinking: body.thinking },
       c.req.raw.signal,
     );
     const ms = Math.round(performance.now() - started);
-    log({ warmup: true, model: body.model ?? DEFAULT_MODEL, ms, usage: done?.usage, error: error?.kind });
+    log({ warmup: true, provider: 'claude', model, ms, usage: done?.usage, error: error?.kind });
     return c.json({ ok: !error, ms, usage: done?.usage, message: error?.message });
   });
 
@@ -99,15 +133,23 @@ export function createApp(deps: AppDeps) {
 }
 
 async function* linesFor(deps: AppDeps, req: RemoteRequest, signal: AbortSignal): AsyncGenerator<RemoteLine> {
-  if (req.provider !== 'claude') {
-    yield { type: 'error', kind: 'bad-request', message: `Unknown provider "${req.provider}".` };
+  if (req.provider === 'claude') {
+    if (!deps.claude) {
+      yield { type: 'error', kind: 'auth', message: 'No API key: set ANTHROPIC_API_KEY in .env and restart the server.' };
+      return;
+    }
+    yield* streamClaudeOptions({ ...deps.claude, beforeCall: () => deps.limiter.take() }, req, signal);
     return;
   }
-  if (!deps.claude) {
-    yield { type: 'error', kind: 'auth', message: 'No API key: set ANTHROPIC_API_KEY in .env and restart the server.' };
+  if (req.provider === 'gemini') {
+    if (!deps.gemini) {
+      yield { type: 'error', kind: 'auth', message: 'No API key: set GEMINI_API_KEY in .env and restart the server.' };
+      return;
+    }
+    yield* streamGeminiOptions({ ...deps.gemini, beforeCall: () => deps.limiter.take() }, req, signal);
     return;
   }
-  yield* streamClaudeOptions({ ...deps.claude, beforeCall: () => deps.limiter.take() }, req, signal);
+  yield { type: 'error', kind: 'bad-request', message: `Unknown provider "${req.provider}".` };
 }
 
 function parseRequest(body: unknown): RemoteRequest {
@@ -120,10 +162,11 @@ function parseRequest(body: unknown): RemoteRequest {
     throw new Error('The selection is outside the buffer.');
   }
   const mode = b.mode ?? 'shape';
+  const provider = b.provider ?? (b.model?.startsWith('gemini') ? 'gemini' : 'claude');
   return {
     ...(b as RemoteRequest),
-    provider: b.provider ?? 'claude',
-    model: b.model || (MODE_DEFAULT_MODELS[mode] ?? DEFAULT_MODEL),
+    provider,
+    model: b.model || defaultModelFor(provider, mode),
     instruction: b.instruction ?? '',
     cps: typeof b.cps === 'number' ? b.cps : 0.5,
     mode,

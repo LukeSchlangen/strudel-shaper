@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "concurrently -k -n vite,proxy -c blue,magenta \"vite\" \"tsx watch server/index.ts\"",
     "dev:web": "vite",
+    "start": "tsx server/index.ts",
     "server": "tsx server/index.ts",
     "build": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && vite build",
     "preview": "vite preview",
@@ -24,6 +25,7 @@
     "@codemirror/language": "6.13.1",
     "@codemirror/state": "6.7.6",
     "@codemirror/view": "6.43.14",
+    "@google/genai": "^2.30.0",
     "@hono/node-server": "2.1.5",
     "@strudel/core": "1.2.6",
     "@strudel/mini": "1.2.6",
@@ -34,12 +36,12 @@
     "diff": "9.0.0",
     "dotenv": "18.0.8",
     "hono": "4.13.13",
-    "prettier": "3.9.10"
+    "prettier": "3.9.10",
+    "tsx": "4.23.15"
   },
   "devDependencies": {
     "@types/node": "24.19.2",
     "concurrently": "10.0.6",
-    "tsx": "4.23.15",
     "typescript": "7.0.2",
     "vite": "8.3.4",
     "vitest": "5.0.5"

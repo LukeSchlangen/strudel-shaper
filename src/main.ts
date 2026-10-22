@@ -48,11 +48,19 @@ document.getElementById('stop')!.addEventListener('click', () => mirror.stop());
 /** The mock stays available offline (its minimal fix only balances brackets and quotes). */
 const mockProvider = new MockProvider({ seed: Date.now() >>> 0, ...devMockOptions() });
 
-/** What the header select and Alt+P cycle through. `?provider=mock|claude&model=…` picks the first one. */
-const CHOICES = [
+export interface Choice {
+  id: string;
+  label: string;
+  disabled?: boolean;
+}
+
+/** What the header select and Alt+P cycle through. `?provider=mock|claude|gemini&model=…` picks the first one. */
+const CHOICES: Choice[] = [
   { id: 'mock', label: 'mock' },
   { id: 'claude:claude-haiku-5-5', label: 'claude · haiku 5.5' },
   { id: 'claude:claude-sonnet-5-5', label: 'claude · sonnet 5.5' },
+  { id: 'gemini:gemini-2.5-flash', label: 'gemini · 2.5 flash' },
+  { id: 'gemini:gemini-2.5-pro', label: 'gemini · 2.5 pro' },
 ];
 
 const query = new URLSearchParams(location.search);
@@ -91,6 +99,7 @@ function makeProvider(id: string): Provider {
 function initialChoice(): string {
   const p = query.get('provider');
   if (p === 'claude') return `claude:${query.get('model') ?? 'claude-haiku-5-5'}`;
+  if (p === 'gemini') return `gemini:${query.get('model') ?? 'gemini-2.5-flash'}`;
   return 'mock';
 }
 
@@ -102,8 +111,32 @@ if (!CHOICES.some((c) => c.id === providerId)) {
 let provider: Provider = makeProvider(providerId);
 
 const providerSelect = document.getElementById('provider') as HTMLSelectElement;
-providerSelect.innerHTML = CHOICES.map((c) => `<option value="${c.id}">${c.label}</option>`).join('');
-providerSelect.value = providerId;
+
+function renderChoices() {
+  providerSelect.innerHTML = CHOICES.map((c) => {
+    const disabledAttr = c.disabled ? ' disabled' : '';
+    const label = c.disabled ? `${c.label} (disabled)` : c.label;
+    return `<option value="${c.id}"${disabledAttr}>${label}</option>`;
+  }).join('');
+  providerSelect.value = providerId;
+}
+
+renderChoices();
+
+// Check which models are enabled by the deployed backend environment variables
+fetch('/api/models')
+  .then((r) => (r.ok ? r.json() : null))
+  .then((data) => {
+    if (!data?.providers) return;
+    for (const choice of CHOICES) {
+      if (choice.id === 'mock') continue;
+      const [prov] = choice.id.split(':');
+      choice.disabled = !data.providers[prov];
+    }
+    renderChoices();
+  })
+  .catch(() => {});
+
 providerSelect.addEventListener('change', () => {
   switchProvider(providerSelect.value);
   view.focus();
@@ -130,8 +163,11 @@ function switchProvider(id: string) {
 }
 
 function cycleProvider() {
-  const i = CHOICES.findIndex((c) => c.id === providerId);
-  switchProvider(CHOICES[(i + 1) % CHOICES.length].id);
+  const available = CHOICES.filter((c) => !c.disabled);
+  if (available.length <= 1) return;
+  const currentIdx = available.findIndex((c) => c.id === providerId);
+  const nextChoice = available[(currentIdx + 1) % available.length];
+  switchProvider(nextChoice.id);
 }
 
 // Warm-up (`?warmup=0` turns it off): after the first user gesture, one cheap request with the real
@@ -792,8 +828,8 @@ function render() {
 function providerLabel(mode: Mode = 'shape', answered?: string) {
   if (provider instanceof RemoteProvider) {
     const name = provider.name.split(' · ')[0];
-    if (answered) return `${name} · ${answered.replace(/^claude-/, '')}`;
-    if (mode !== 'shape') return `${name} · ${modelForMode(query, provider.model)(mode)?.replace(/^claude-/, '') ?? `${mode} default`}`;
+    if (answered) return `${name} · ${answered.replace(/^(claude|gemini)-/, '')}`;
+    if (mode !== 'shape') return `${name} · ${modelForMode(query, provider.model)(mode)?.replace(/^(claude|gemini)-/, '') ?? `${mode} default`}`;
   }
   if (!(provider instanceof MockProvider) || provider.faultRate === 0) return provider.name;
   return `${provider.name} (faults ${Math.round(provider.faultRate * 100)}%${provider.faultKind ? ` ${provider.faultKind}` : ''}${provider.retryFails ? ', retries fail' : ''})`;

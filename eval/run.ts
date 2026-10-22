@@ -14,6 +14,7 @@
  * Requests run one after another so their timings don't interfere.
  */
 import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenAI } from '@google/genai';
 import { EditorState } from '@codemirror/state';
 import { javascript } from '@codemirror/lang-javascript';
 import { ensureSyntaxTree } from '@codemirror/language';
@@ -40,9 +41,11 @@ function parseArgs(args: string[]) {
     const i = args.indexOf(`--${name}`);
     return i >= 0 && args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : undefined;
   };
+  const model = get('model') ?? 'claude-haiku-5-5';
+  const provider = get('provider') ?? (model.startsWith('gemini') ? 'gemini' : 'claude');
   return {
-    provider: get('provider') ?? 'claude',
-    model: get('model') ?? 'claude-haiku-5-5',
+    provider,
+    model,
     mode: (get('mode') ?? 'shape') as 'shape' | 'fix',
     effort: get('effort') as Effort | undefined,
     thinking: get('thinking') as ThinkingSetting | undefined,
@@ -69,9 +72,11 @@ function nodeWorker(): WorkerLike {
 
 export async function main(argv: string[]) {
   const opts = parseArgs(argv);
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set (put it in .env).');
-  if (opts.provider !== 'claude') throw new Error(`Unknown provider "${opts.provider}".`);
+  const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  const geminiApiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)?.trim();
+  if (opts.provider === 'claude' && !anthropicApiKey) throw new Error('ANTHROPIC_API_KEY is not set (put it in .env).');
+  if (opts.provider === 'gemini' && !geminiApiKey) throw new Error('GEMINI_API_KEY is not set (put it in .env).');
+  if (opts.provider !== 'claude' && opts.provider !== 'gemini') throw new Error(`Unknown provider "${opts.provider}".`);
 
   const scope = JSON.parse(read('src/generated/scope.json'));
   const soundList = JSON.parse(read('src/generated/sounds.json')) as string[];
@@ -85,7 +90,8 @@ export async function main(argv: string[]) {
   let cps = 0.5;
 
   const app = createApp({
-    claude: { client: new Anthropic({ apiKey, maxRetries: 1 }), reference, maxTokens: 2048, schemaKey: opts.schemaKey },
+    claude: anthropicApiKey ? { client: new Anthropic({ apiKey: anthropicApiKey, maxRetries: 1 }), reference, maxTokens: 2048, schemaKey: opts.schemaKey } : null,
+    gemini: geminiApiKey ? { client: new GoogleGenAI({ apiKey: geminiApiKey }), reference, maxTokens: 2048 } : null,
     limiter: new RateLimiter(10_000),
     log: () => {},
   });
@@ -93,7 +99,7 @@ export async function main(argv: string[]) {
   const settings = { effort: opts.effort, thinking: opts.thinking, strategy: opts.strategy };
   const provider = new RemoteProvider({ provider: opts.provider, model: opts.model, fetch: appFetch, sounds: () => sounds, settings: () => settings });
 
-  const label = opts.label ?? [opts.mode === 'fix' ? 'fix' : '', opts.model.replace(/^claude-/, ''), opts.thinking ?? 'default', opts.effort ?? 'default', opts.strategy ?? 'single', opts.warmup ? 'warm' : ''].filter(Boolean).join('-');
+  const label = opts.label ?? [opts.mode === 'fix' ? 'fix' : '', opts.model.replace(/^(claude|gemini)-/, ''), opts.thinking ?? 'default', opts.effort ?? 'default', opts.strategy ?? 'single', opts.warmup ? 'warm' : ''].filter(Boolean).join('-');
   console.log(`[eval] ${label}`);
 
   let warmupMs: number | undefined;
