@@ -99,6 +99,15 @@ describe('Input size limits in createApp', () => {
     expect(body.message).toContain('Sounds summary exceeds');
   });
 
+  it('accepts legitimate prebaked sounds summary (~4.2k chars)', async () => {
+    const res = await app.request('/api/options', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...baseReq, sounds: 's'.repeat(4500) }),
+    });
+    expect(res.status).not.toBe(400);
+  });
+
   it('rejects payload exceeding MAX_PAYLOAD_BYTES', async () => {
     const res = await app.request('/api/options', {
       method: 'POST',

@@ -21,7 +21,7 @@ export const MAX_PAYLOAD_BYTES = 64 * 1024; // 64 KB
 export const MAX_BUFFER_CHARS = 20_000;
 export const MAX_SELECTION_CHARS = 4_000;
 export const MAX_INSTRUCTION_CHARS = 400;
-export const MAX_SOUNDS_CHARS = 2_000;
+export const MAX_SOUNDS_CHARS = 16_000;
 
 export function getClientIp(c: { req: { header: (name: string) => string | undefined } }): string {
   const forwarded = c.req.header('x-forwarded-for');

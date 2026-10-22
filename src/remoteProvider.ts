@@ -58,7 +58,7 @@ export class RemoteProvider implements Provider {
       ...req,
       provider: this.opts.provider,
       ...(chosen ? { model: chosen } : {}),
-      sounds: this.opts.sounds?.(),
+      sounds: this.opts.sounds?.()?.slice(0, 16_000),
       ...this.opts.settings?.(),
     };
     const doFetch = this.opts.fetch ?? fetch;

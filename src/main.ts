@@ -237,7 +237,7 @@ async function warmUp() {
   const res = await fetch('/api/warmup', {
     method: 'POST',
     headers,
-    body: JSON.stringify({ model, sounds: soundSummary(), ...remoteSettings() }),
+    body: JSON.stringify({ model, sounds: soundSummary()?.slice(0, 16_000), ...remoteSettings() }),
   })
     .then((r) => r.json())
     .catch((err) => ({ ok: false, message: String(err) }));
