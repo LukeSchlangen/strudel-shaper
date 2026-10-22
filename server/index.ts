@@ -9,13 +9,14 @@ import { RateLimiter } from './rateLimit';
 
 /** The proxy: holds API keys (never sent to the browser) and streams options as NDJSON. */
 
-export const MAX_TOKENS_CAP = 4096;
+export const MAX_TOKENS_CAP = 1200;
 
 const isProd = process.env.NODE_ENV === 'production';
 const host = process.env.HOST ?? (isProd ? '0.0.0.0' : '127.0.0.1');
 const port = Number(process.env.PORT ?? (isProd ? 8080 : 8787));
-const perMinute = Number(process.env.RATE_LIMIT_PER_MIN ?? 20) || 20;
-const maxTokens = Math.min(MAX_TOKENS_CAP, Number(process.env.MAX_TOKENS ?? 2048) || 2048);
+const perMinute = Number(process.env.RATE_LIMIT_PER_MIN ?? 25) || 25;
+const perIpPerMinute = Number(process.env.RATE_LIMIT_PER_IP_PER_MIN ?? 10) || 10;
+const maxTokens = Math.min(MAX_TOKENS_CAP, Number(process.env.MAX_TOKENS ?? 1024) || 1024);
 const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim();
 const geminiApiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)?.trim();
 const reference = readFileSync(new URL('../src/generated/strudel-reference.md', import.meta.url), 'utf8');
@@ -27,7 +28,7 @@ const app = createApp({
   // maxRetries 1: a retry on 529/connection errors is worth one attempt, more just adds latency.
   claude: anthropicApiKey ? { client: new Anthropic({ apiKey: anthropicApiKey, maxRetries: 1 }), reference, maxTokens } : null,
   gemini: geminiApiKey ? { client: new GoogleGenAI({ apiKey: geminiApiKey }), reference, maxTokens } : null,
-  limiter: new RateLimiter(perMinute),
+  limiter: new RateLimiter(perMinute, perIpPerMinute),
 });
 
 // In production or when dist/ exists, serve static assets and SPA fallback
@@ -37,5 +38,5 @@ if (existsSync('./dist')) {
 }
 
 serve({ fetch: app.fetch, port, hostname: host }, ({ port }) =>
-  console.log(`[proxy] listening on http://${host}:${port} (max_tokens ${maxTokens}, ${perMinute} calls/min)`),
+  console.log(`[proxy] listening on http://${host}:${port} (max_tokens ${maxTokens}, global ${perMinute}/min, ${perIpPerMinute}/min/ip)`),
 );

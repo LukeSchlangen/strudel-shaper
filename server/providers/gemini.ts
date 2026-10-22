@@ -51,7 +51,7 @@ export function buildGeminiParams(
     systemInstruction,
     responseMimeType: 'application/json',
     responseSchema: optionSchema() as any,
-    maxOutputTokens: opts.maxTokens ?? deps.maxTokens,
+    maxOutputTokens: opts.maxTokens ?? (opts.single ? Math.min(400, deps.maxTokens) : deps.maxTokens),
     ...(signal ? { abortSignal: signal } : {}),
   };
 

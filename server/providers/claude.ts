@@ -44,7 +44,7 @@ export function buildParams(deps: ClaudeDeps, req: RemoteRequest, opts: UserMess
   const effort = req.effort ?? info.defaults.effort;
   return {
     model: info.id,
-    max_tokens: opts.maxTokens ?? deps.maxTokens,
+    max_tokens: opts.maxTokens ?? (opts.single ? Math.min(400, deps.maxTokens) : deps.maxTokens),
     stream: true,
     system: [
       { type: 'text', text: staticSystem(deps.reference), cache_control: { type: 'ephemeral' } },
