@@ -59,8 +59,9 @@ const CHOICES: Choice[] = [
   { id: 'mock', label: 'mock' },
   { id: 'claude:claude-haiku-5-5', label: 'claude · haiku 5.5' },
   { id: 'claude:claude-sonnet-5-5', label: 'claude · sonnet 5.5' },
-  { id: 'gemini:gemini-2.5-flash', label: 'gemini · 2.5 flash' },
-  { id: 'gemini:gemini-2.5-pro', label: 'gemini · 2.5 pro' },
+  { id: 'gemini:gemini-3.5-flash-lite', label: 'gemini · 3.5 flash-lite' },
+  { id: 'gemini:gemini-3.8-flash', label: 'gemini · 3.8 flash' },
+  { id: 'gemini:gemini-4-argon', label: 'gemini · 4 argon' },
 ];
 
 const query = new URLSearchParams(location.search);
@@ -99,7 +100,7 @@ function makeProvider(id: string): Provider {
 function initialChoice(): string {
   const p = query.get('provider');
   if (p === 'claude') return `claude:${query.get('model') ?? 'claude-haiku-5-5'}`;
-  if (p === 'gemini') return `gemini:${query.get('model') ?? 'gemini-2.5-flash'}`;
+  if (p === 'gemini') return `gemini:${query.get('model') ?? 'gemini-3.8-flash'}`;
   return 'mock';
 }
 

@@ -11,7 +11,7 @@ const SEL = 's("hh*8").gain(0.6)';
 const FROM = BUFFER.indexOf(SEL);
 const req: RemoteRequest = {
   provider: 'gemini',
-  model: 'gemini-2.5-flash',
+  model: 'gemini-3.8-flash',
   mode: 'shape',
   buffer: BUFFER,
   selection: { from: FROM, to: FROM + SEL.length, text: SEL },
@@ -39,7 +39,7 @@ async function collect(gen: AsyncIterable<RemoteLine>) {
 describe('buildGeminiParams', () => {
   it('configures system instruction, response schema, and user contents with marked selection', () => {
     const p = buildGeminiParams(deps(new FakeGemini([])), req);
-    expect(p.model).toBe('gemini-2.5-flash');
+    expect(p.model).toBe('gemini-3.8-flash');
     const system = String(p.config?.systemInstruction);
     expect(system).toContain('REFERENCE');
     expect(system).toContain('Drums: bd hh');
@@ -80,7 +80,7 @@ describe('streamGeminiOptions', () => {
     const done = lines.find((l) => l.type === 'done');
     expect(done).toMatchObject({
       type: 'done',
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       usage: { input: 120, output: 80, cacheRead: 0, cacheWrite: 0 },
     });
   });
@@ -153,7 +153,7 @@ describe('parallel strategy', () => {
 describe('warmUp', () => {
   it('issues a warm-up call with minimal tokens', async () => {
     const client = new FakeGemini([geminiTextChunks(payload(1))]);
-    const result = await warmUp(deps(client), { model: 'gemini-2.5-flash' }, new AbortController().signal);
+    const result = await warmUp(deps(client), { model: 'gemini-3.8-flash' }, new AbortController().signal);
     expect(result.done).toBeDefined();
     expect(client.calls[0].params.config?.maxOutputTokens).toBe(200);
   });
@@ -169,7 +169,7 @@ describe('proxy app integration for Gemini', () => {
     const resBoth = await appBoth.fetch(new Request('http://localhost/api/models'));
     const bodyBoth = await resBoth.json();
     expect(bodyBoth.providers).toEqual({ claude: true, gemini: true });
-    expect(bodyBoth.models.find((m: any) => m.id === 'gemini:gemini-2.5-flash').enabled).toBe(true);
+    expect(bodyBoth.models.find((m: any) => m.id === 'gemini:gemini-3.8-flash').enabled).toBe(true);
 
     const appGeminiOnly = createApp({
       claude: null,
@@ -180,7 +180,7 @@ describe('proxy app integration for Gemini', () => {
     const bodyGeminiOnly = await resGeminiOnly.json();
     expect(bodyGeminiOnly.providers).toEqual({ claude: false, gemini: true });
     expect(bodyGeminiOnly.models.find((m: any) => m.id === 'claude:claude-haiku-5-5').enabled).toBe(false);
-    expect(bodyGeminiOnly.models.find((m: any) => m.id === 'gemini:gemini-2.5-flash').enabled).toBe(true);
+    expect(bodyGeminiOnly.models.find((m: any) => m.id === 'gemini:gemini-3.8-flash').enabled).toBe(true);
   });
 
   it('streams options via POST /api/options with provider: gemini', async () => {

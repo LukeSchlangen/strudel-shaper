@@ -61,8 +61,9 @@ export function createApp(deps: AppDeps) {
         { id: 'mock', provider: 'mock', label: 'mock', enabled: true },
         { id: 'claude:claude-haiku-5-5', provider: 'claude', model: 'claude-haiku-5-5', label: 'claude · haiku 5.5', enabled: !!deps.claude },
         { id: 'claude:claude-sonnet-5-5', provider: 'claude', model: 'claude-sonnet-5-5', label: 'claude · sonnet 5.5', enabled: !!deps.claude },
-        { id: 'gemini:gemini-2.5-flash', provider: 'gemini', model: 'gemini-2.5-flash', label: 'gemini · 2.5 flash', enabled: !!deps.gemini },
-        { id: 'gemini:gemini-2.5-pro', provider: 'gemini', model: 'gemini-2.5-pro', label: 'gemini · 2.5 pro', enabled: !!deps.gemini },
+        { id: 'gemini:gemini-3.5-flash-lite', provider: 'gemini', model: 'gemini-3.5-flash-lite', label: 'gemini · 3.5 flash-lite', enabled: !!deps.gemini },
+        { id: 'gemini:gemini-3.8-flash', provider: 'gemini', model: 'gemini-3.8-flash', label: 'gemini · 3.8 flash', enabled: !!deps.gemini },
+        { id: 'gemini:gemini-4-argon', provider: 'gemini', model: 'gemini-4-argon', label: 'gemini · 4 argon', enabled: !!deps.gemini },
       ],
     });
   });
@@ -151,7 +152,7 @@ export function createApp(deps: AppDeps) {
 
     if (provider === 'gemini') {
       if (!deps.gemini) return c.json({ ok: false, message: 'No Gemini API key configured.' });
-      const model = body.model ?? 'gemini-2.5-flash';
+      const model = body.model ?? 'gemini-3.8-flash';
       const { done, error } = await warmUpGemini(
         { ...deps.gemini, beforeCall: () => deps.limiter.take(clientIp) },
         { model, sounds: body.sounds, effort: body.effort, thinking: body.thinking },

@@ -10,7 +10,7 @@ import type { RemoteRequest } from '../src/remoteProtocol';
 
 const baseReq: RemoteRequest = {
   provider: 'gemini',
-  model: 'gemini-2.5-flash',
+  model: 'gemini-3.8-flash',
   mode: 'shape',
   buffer: 's("bd*4")',
   selection: { from: 0, to: 9, text: 's("bd*4")' },

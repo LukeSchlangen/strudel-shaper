@@ -29,6 +29,25 @@ export const MODELS: Record<string, ModelInfo> = {
     thinkingOff: { type: 'between_tools' },
     defaults: { effort: 'low', thinking: 'off' },
   },
+  'gemini-3.5-flash-lite': {
+    id: 'gemini-3.5-flash-lite',
+    provider: 'gemini',
+    prices: { input: 0.05, cacheWrite5m: 0.0125, cacheRead: 0.0125, output: 0.2 },
+    defaults: { effort: 'low', thinking: 'off' },
+  },
+  'gemini-3.8-flash': {
+    id: 'gemini-3.8-flash',
+    provider: 'gemini',
+    prices: { input: 0.1, cacheWrite5m: 0.025, cacheRead: 0.025, output: 0.4 },
+    defaults: { effort: 'low', thinking: 'off' },
+  },
+  'gemini-4-argon': {
+    id: 'gemini-4-argon',
+    provider: 'gemini',
+    prices: { input: 1.0, cacheWrite5m: 0.25, cacheRead: 0.25, output: 4.0 },
+    defaults: { effort: 'low', thinking: 'off' },
+  },
+  // Compatibility aliases
   'gemini-2.5-flash': {
     id: 'gemini-2.5-flash',
     provider: 'gemini',
@@ -41,16 +60,10 @@ export const MODELS: Record<string, ModelInfo> = {
     prices: { input: 1.25, cacheWrite5m: 0.3125, cacheRead: 0.3125, output: 5 },
     defaults: { effort: 'low', thinking: 'off' },
   },
-  'gemini-2.0-flash': {
-    id: 'gemini-2.0-flash',
-    provider: 'gemini',
-    prices: { input: 0.1, cacheWrite5m: 0.025, cacheRead: 0.025, output: 0.4 },
-    defaults: { effort: 'low', thinking: 'off' },
-  },
 };
 
 export const DEFAULT_MODEL = 'claude-haiku-5-5';
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
 
 /**
  * The model for each mode when the browser doesn't name one (NOTES.md, milestone 5).
@@ -63,8 +76,8 @@ export const MODE_DEFAULT_MODELS: Record<string, string> = {
 
 export const GEMINI_MODE_DEFAULT_MODELS: Record<string, string> = {
   shape: DEFAULT_GEMINI_MODEL,
-  'fix-minimal': 'gemini-2.5-flash',
-  'fix-rewrite': 'gemini-2.5-pro',
+  'fix-minimal': 'gemini-3.5-flash-lite',
+  'fix-rewrite': 'gemini-4-argon',
 };
 
 export function defaultModelFor(provider: string, mode: string): string {
