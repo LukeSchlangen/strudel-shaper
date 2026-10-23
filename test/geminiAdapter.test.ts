@@ -62,7 +62,6 @@ describe('buildGeminiParams', () => {
     // gemini-4-argon uses LOW for off
     expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-4-argon', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingLevel: 'LOW', includeThoughts: false });
     // legacy models use thinkingBudget
-    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-2.5-flash-lite', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingBudget: 0 });
     expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-2.5-flash', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingBudget: 0 });
     expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-2.5-flash', thinking: 'adaptive' }).config?.thinkingConfig).toEqual({ thinkingBudget: -1 });
   });

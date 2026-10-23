@@ -93,7 +93,7 @@ export function resolveGeminiThinkingConfig(
   }
 
   // Legacy models (Gemini 2.5 series) use thinkingBudget
-  if (thinking === 'off' || (modelId.includes('flash-lite') && (effort === 'low' || !effort))) {
+  if (thinking === 'off') {
     return { thinkingBudget: 0 };
   } else if (thinking === 'adaptive') {
     return { thinkingBudget: -1 };
