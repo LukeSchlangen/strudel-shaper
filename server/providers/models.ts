@@ -48,6 +48,12 @@ export const MODELS: Record<string, ModelInfo> = {
     defaults: { effort: 'low', thinking: 'off' },
   },
   // Compatibility aliases
+  'gemini-2.5-flash-lite': {
+    id: 'gemini-2.5-flash-lite',
+    provider: 'gemini',
+    prices: { input: 0.05, cacheWrite5m: 0.0125, cacheRead: 0.0125, output: 0.2 },
+    defaults: { effort: 'low', thinking: 'off' },
+  },
   'gemini-2.5-flash': {
     id: 'gemini-2.5-flash',
     provider: 'gemini',

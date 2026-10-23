@@ -53,14 +53,16 @@ describe('buildGeminiParams', () => {
 
   it('configures thinkingLevel for Gemini 3/4 models and thinkingBudget for legacy models', () => {
     const c = new FakeGemini([]);
-    // gemini-3.5-flash-lite uses MINIMAL for off
-    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-3.5-flash-lite', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingLevel: 'MINIMAL' });
+    // gemini-3.5-flash-lite uses MINIMAL for off and low effort, suppressing thoughts
+    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-3.5-flash-lite', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingLevel: 'MINIMAL', includeThoughts: false });
+    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-3.5-flash-lite', thinking: 'adaptive', effort: 'low' }).config?.thinkingConfig).toEqual({ thinkingLevel: 'MINIMAL', includeThoughts: false });
     // gemini-3.8-flash uses LOW for off, and respects effort on adaptive
-    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-3.8-flash', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingLevel: 'LOW' });
-    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-3.8-flash', thinking: 'adaptive', effort: 'high' }).config?.thinkingConfig).toEqual({ thinkingLevel: 'HIGH' });
+    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-3.8-flash', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingLevel: 'LOW', includeThoughts: false });
+    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-3.8-flash', thinking: 'adaptive', effort: 'high' }).config?.thinkingConfig).toEqual({ thinkingLevel: 'HIGH', includeThoughts: false });
     // gemini-4-argon uses LOW for off
-    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-4-argon', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingLevel: 'LOW' });
+    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-4-argon', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingLevel: 'LOW', includeThoughts: false });
     // legacy models use thinkingBudget
+    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-2.5-flash-lite', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingBudget: 0 });
     expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-2.5-flash', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingBudget: 0 });
     expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-2.5-flash', thinking: 'adaptive' }).config?.thinkingConfig).toEqual({ thinkingBudget: -1 });
   });

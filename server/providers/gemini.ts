@@ -73,26 +73,27 @@ export function resolveGeminiThinkingConfig(
 ): GenerateContentConfig['thinkingConfig'] {
   // Gemini 3.x and 4.x models use thinkingLevel
   if (modelId.startsWith('gemini-3') || modelId.startsWith('gemini-4')) {
-    if (modelId === 'gemini-3.5-flash-lite') {
-      if (thinking === 'off') {
-        return { thinkingLevel: ThinkingLevel.MINIMAL };
+    if (modelId.includes('flash-lite')) {
+      if (thinking === 'off' || effort === 'low' || !effort) {
+        return { thinkingLevel: ThinkingLevel.MINIMAL, includeThoughts: false };
       }
-      if (effort === 'high') return { thinkingLevel: ThinkingLevel.HIGH };
-      if (effort === 'medium') return { thinkingLevel: ThinkingLevel.MEDIUM };
-      return { thinkingLevel: ThinkingLevel.LOW };
+      if (effort === 'high') return { thinkingLevel: ThinkingLevel.HIGH, includeThoughts: false };
+      if (effort === 'medium') return { thinkingLevel: ThinkingLevel.MEDIUM, includeThoughts: false };
+      return { thinkingLevel: ThinkingLevel.MINIMAL, includeThoughts: false };
     }
 
     // gemini-3.8-flash, gemini-4-argon (support LOW, MEDIUM, HIGH)
-    if (thinking === 'off') {
-      return { thinkingLevel: ThinkingLevel.LOW };
-    }
-    if (effort === 'high') return { thinkingLevel: ThinkingLevel.HIGH };
-    if (effort === 'medium') return { thinkingLevel: ThinkingLevel.MEDIUM };
-    return { thinkingLevel: ThinkingLevel.LOW };
+    const level = thinking === 'off' || effort === 'low'
+      ? ThinkingLevel.LOW
+      : effort === 'high'
+        ? ThinkingLevel.HIGH
+        : ThinkingLevel.MEDIUM;
+
+    return { thinkingLevel: level, includeThoughts: false };
   }
 
   // Legacy models (Gemini 2.5 series) use thinkingBudget
-  if (thinking === 'off') {
+  if (thinking === 'off' || (modelId.includes('flash-lite') && (effort === 'low' || !effort))) {
     return { thinkingBudget: 0 };
   } else if (thinking === 'adaptive') {
     return { thinkingBudget: -1 };
@@ -112,10 +113,11 @@ export function buildGeminiParams(
   const systemInstruction = `${staticSystem(deps.reference)}\n\n${soundsSystem(req.sounds)}`;
 
   // For Gemini, thinking tokens share maxOutputTokens with candidate tokens.
-  // We cap single-option calls at 800 tokens (or deps.maxTokens if smaller) so thinking
-  // plus response can complete without truncation or INVALID_ARGUMENT rejection.
+  // We cap single-option calls and minimal fixes tightly so thinking
+  // plus response can complete without unneeded tail latency.
   const singleCap = Math.min(800, deps.maxTokens);
-  const maxOutputTokens = opts.maxTokens ?? (opts.single ? singleCap : deps.maxTokens);
+  const modeCap = req.mode === 'fix-minimal' ? Math.min(400, deps.maxTokens) : opts.single ? singleCap : deps.maxTokens;
+  const maxOutputTokens = opts.maxTokens ?? modeCap;
 
   const config: GenerateContentConfig = {
     systemInstruction,
@@ -242,6 +244,10 @@ async function* oneCall(
           lastMs = t;
           yield { type: 'option', ...option };
         }
+        if (emitted >= limit) {
+          call.abort();
+          break;
+        }
       }
     }
   } catch (err) {
@@ -268,10 +274,12 @@ async function* oneCall(
   } else if (finishReason === 'MAX_TOKENS') {
     yield { type: 'error', kind: 'truncated', message: `The output hit max_tokens (${opts.maxTokens ?? deps.maxTokens}) before it finished.` };
   } else {
-    problems.push(...parser.end());
+    if (emitted < limit) {
+      problems.push(...parser.end());
+    }
     if (emitted === 0) {
       yield { type: 'error', kind: 'internal', message: problems[0] ?? 'The model returned no options.' };
-    } else if (problems.length) {
+    } else if (problems.length && emitted < limit) {
       console.warn('[proxy] output problems', problems);
     }
   }

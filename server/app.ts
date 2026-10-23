@@ -181,6 +181,13 @@ export function createApp(deps: AppDeps) {
         { model, sounds: body.sounds, effort: body.effort, thinking: body.thinking },
         c.req.raw.signal,
       );
+      if (model !== 'gemini-3.5-flash-lite') {
+        warmUpGemini(
+          { ...deps.gemini, beforeCall: () => true },
+          { model: 'gemini-3.5-flash-lite', sounds: body.sounds, effort: 'low', thinking: 'off' },
+          c.req.raw.signal,
+        ).catch(() => {});
+      }
       const ms = Math.round(performance.now() - started);
       log({ warmup: true, provider: 'gemini', model, ms, usage: done?.usage, error: error?.kind });
       return c.json({ ok: !error, ms, usage: done?.usage, message: error?.message });
