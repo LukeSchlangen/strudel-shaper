@@ -51,7 +51,7 @@ describe('buildGeminiParams', () => {
     expect(user).toContain('Instruction: busier');
   });
 
-  it('configures thinkingLevel for Gemini 3/4 models and thinkingBudget for legacy models', () => {
+  it('configures thinkingLevel for Gemini 3/4 models', () => {
     const c = new FakeGemini([]);
     // gemini-3.5-flash-lite uses MINIMAL for off and low effort, suppressing thoughts
     expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-3.5-flash-lite', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingLevel: 'MINIMAL', includeThoughts: false });
@@ -61,9 +61,6 @@ describe('buildGeminiParams', () => {
     expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-3.8-flash', thinking: 'adaptive', effort: 'high' }).config?.thinkingConfig).toEqual({ thinkingLevel: 'HIGH', includeThoughts: false });
     // gemini-4-argon uses LOW for off
     expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-4-argon', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingLevel: 'LOW', includeThoughts: false });
-    // legacy models use thinkingBudget
-    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-2.5-flash', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingBudget: 0 });
-    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-2.5-flash', thinking: 'adaptive' }).config?.thinkingConfig).toEqual({ thinkingBudget: -1 });
   });
 
   it('phrases retries as feedback and asks for one option', () => {

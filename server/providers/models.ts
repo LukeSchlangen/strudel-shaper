@@ -47,19 +47,6 @@ export const MODELS: Record<string, ModelInfo> = {
     prices: { input: 1.0, cacheWrite5m: 0.25, cacheRead: 0.25, output: 4.0 },
     defaults: { effort: 'low', thinking: 'off' },
   },
-  // Compatibility aliases
-  'gemini-2.5-flash': {
-    id: 'gemini-2.5-flash',
-    provider: 'gemini',
-    prices: { input: 0.1, cacheWrite5m: 0.025, cacheRead: 0.025, output: 0.4 },
-    defaults: { effort: 'low', thinking: 'off' },
-  },
-  'gemini-2.5-pro': {
-    id: 'gemini-2.5-pro',
-    provider: 'gemini',
-    prices: { input: 1.25, cacheWrite5m: 0.3125, cacheRead: 0.3125, output: 5 },
-    defaults: { effort: 'low', thinking: 'off' },
-  },
 };
 
 export const DEFAULT_MODEL = 'claude-haiku-5-5';

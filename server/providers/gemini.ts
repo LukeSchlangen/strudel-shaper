@@ -63,42 +63,30 @@ export function geminiOptionSchema(key = 'options'): Schema {
 
 /**
  * Resolves the appropriate ThinkingConfig for the Gemini model.
- * Newer models (Gemini 3.x and 4.x) reject thinkingBudget with INVALID_ARGUMENT (400)
- * and require thinkingLevel instead. Legacy models (Gemini 2.5) use thinkingBudget.
+ * Gemini 3.x and 4.x models require thinkingLevel.
  */
 export function resolveGeminiThinkingConfig(
   modelId: string,
   thinking: ThinkingSetting,
   effort?: Effort,
 ): GenerateContentConfig['thinkingConfig'] {
-  // Gemini 3.x and 4.x models use thinkingLevel
-  if (modelId.startsWith('gemini-3') || modelId.startsWith('gemini-4')) {
-    if (modelId.includes('flash-lite')) {
-      if (thinking === 'off' || effort === 'low' || !effort) {
-        return { thinkingLevel: ThinkingLevel.MINIMAL, includeThoughts: false };
-      }
-      if (effort === 'high') return { thinkingLevel: ThinkingLevel.HIGH, includeThoughts: false };
-      if (effort === 'medium') return { thinkingLevel: ThinkingLevel.MEDIUM, includeThoughts: false };
+  if (modelId.includes('flash-lite')) {
+    if (thinking === 'off' || effort === 'low' || !effort) {
       return { thinkingLevel: ThinkingLevel.MINIMAL, includeThoughts: false };
     }
-
-    // gemini-3.8-flash, gemini-4-argon (support LOW, MEDIUM, HIGH)
-    const level = thinking === 'off' || effort === 'low'
-      ? ThinkingLevel.LOW
-      : effort === 'high'
-        ? ThinkingLevel.HIGH
-        : ThinkingLevel.MEDIUM;
-
-    return { thinkingLevel: level, includeThoughts: false };
+    if (effort === 'high') return { thinkingLevel: ThinkingLevel.HIGH, includeThoughts: false };
+    if (effort === 'medium') return { thinkingLevel: ThinkingLevel.MEDIUM, includeThoughts: false };
+    return { thinkingLevel: ThinkingLevel.MINIMAL, includeThoughts: false };
   }
 
-  // Legacy models (Gemini 2.5 series) use thinkingBudget
-  if (thinking === 'off') {
-    return { thinkingBudget: 0 };
-  } else if (thinking === 'adaptive') {
-    return { thinkingBudget: -1 };
-  }
-  return undefined;
+  // gemini-3.8-flash, gemini-4-argon (support LOW, MEDIUM, HIGH)
+  const level = thinking === 'off' || effort === 'low'
+    ? ThinkingLevel.LOW
+    : effort === 'high'
+      ? ThinkingLevel.HIGH
+      : ThinkingLevel.MEDIUM;
+
+  return { thinkingLevel: level, includeThoughts: false };
 }
 
 export function buildGeminiParams(
