@@ -10,6 +10,7 @@ import { commitSpec } from './commit';
 import { FormatError, formatCode, mapOffset } from './format';
 import { LARGE_CHANGE_CHARS, diffSegments, type DiffGranularity } from './diff';
 import { diagnoseFix, noRequestReason, trayFix, type TrayFix } from './fixTarget';
+import { generateCapture, noRunnableCode } from './generate';
 import { InstructionBox } from './instructionBox';
 import { InstructionHistory } from './instructionHistory';
 import { FAULT_KINDS, MockProvider, type FaultKind } from './mockProvider';
@@ -40,6 +41,8 @@ const quantizer = new Quantizer(scheduler);
 const statusEl = document.getElementById('status')!;
 const trayEl = document.getElementById('tray')!;
 const actionsEl = document.getElementById('actions')!;
+const emptyStateEl = document.getElementById('empty-state')!;
+const generateButton = actionsEl.querySelector<HTMLButtonElement>('[data-action=generate]')!;
 
 document.getElementById('play')!.addEventListener('click', () => mirror.evaluate());
 document.getElementById('stop')!.addEventListener('click', () => mirror.stop());
@@ -382,11 +385,12 @@ function evaluateCode(code: string, label: string, audition?: { range: Range }):
 }
 
 /**
- * Fix modes on code that doesn't evaluate: what was playing when the tray opened, and the tempo.
- * 0/Esc swap back to it (quantized, through the same queue as evaluations), since evaluating the
- * broken original would fail and leave the last auditioned fix playing.
+ * Fix modes on code that doesn't evaluate, and generate on an empty editor: what was playing when
+ * the tray opened, and the tempo. 0/Esc swap back to it (quantized, through the same queue as
+ * evaluations), since evaluating the original would fail and leave the last auditioned option
+ * playing. If the clock was stopped, it is stopped again once the swap to silence has landed.
  */
-let snapshot: { pattern: any; cps: number } | null = null;
+let snapshot: { pattern: any; cps: number; started: boolean } | null = null;
 
 function restoreSnapshot(): Promise<unknown> {
   const generation = ++evalGeneration;
@@ -397,6 +401,12 @@ function restoreSnapshot(): Promise<unknown> {
     quantizer.swapTo(snapshot.pattern);
     mirror.drawer?.invalidate?.(scheduler);
     logSwap('original (restored)', before, clockSnapshot());
+    // Nothing was playing before: stop the clock on the beat, unless something else was evaluated since.
+    if (!snapshot.started) {
+      void quantizer.landed().then(() => {
+        if (generation === evalGeneration && scheduler.started) mirror.stop();
+      });
+    }
     return true;
   });
   evalChain = result;
@@ -490,6 +500,8 @@ async function resumeHighlight() {
 // --- Tray state -------------------------------------------------------------------------------
 
 let state: TrayState = initialState;
+/** A one-off next step for the status line (after a New idea commit), until the next edit or request. */
+let statusNote: string | null = null;
 let liveRange: Range | null = null; // the captured range, carried through edits made outside it
 let requestSeq = 0;
 let controller: AbortController | null = null;
@@ -534,6 +546,8 @@ async function run(effect: Effect) {
       void resumeHighlight();
       return;
     case 'auditionOption': {
+      // An empty editor's first audition starts the clock (repl.evaluate autostarts); make sure audio is on.
+      if (!scheduler.started) void getAudioContext().resume();
       const code = splice(view.state.doc.toString(), liveRange!, effect.code);
       const ok = await evaluateCode(code, `option ${effect.slot}`, { range: liveRange! });
       if (!ok) await send({ type: 'evalFailed', slot: effect.slot });
@@ -544,15 +558,19 @@ async function run(effect: Effect) {
       return;
     case 'snapshotPlaying':
       // Nothing playing yet: an audition will start the clock, and going back means silence.
-      snapshot = { pattern: scheduler.started ? quantizer.playing() : silence, cps: scheduler.cps };
+      snapshot = { pattern: scheduler.started ? quantizer.playing() : silence, cps: scheduler.cps, started: scheduler.started };
       return;
     case 'restoreSnapshot':
       await restoreSnapshot();
       return;
     case 'commit':
-      view.dispatch(commitSpec(liveRange!, effect.code));
+      // Generate fills the editor: a cursor, not a whole-buffer selection that the next keypress would replace.
+      view.dispatch(commitSpec(liveRange!, effect.code, effect.mode !== 'generate'));
       mirror.flash();
       liveRange = null;
+      if (effect.mode === 'generate') {
+        statusNote = `Your idea is playing. Select a line and press ⌘/Ctrl+K${matchMedia('(max-width: 600px)').matches ? ' (or tap Shape)' : ''} to shape it.`;
+      }
       return;
   }
 }
@@ -610,6 +628,8 @@ const box = new InstructionBox(view, history);
 
 function startCapture(mode: Mode) {
   if (state.kind === 'committed') return;
+  // ⌘K on an editor with nothing to run starts a new idea instead.
+  if (mode === 'generate' || (mode === 'shape' && noRunnableCode(view.state.doc.toString()))) return startGenerate();
   if (mode !== 'shape') return void startFix(mode);
   const range = captureRange(view.state);
   if (range.from === range.to) {
@@ -621,11 +641,22 @@ function startCapture(mode: Mode) {
   box.open(range, (instruction) => submit(cap, mode, instruction));
 }
 
+/** New idea: four complete programs that replace the empty (or comments-only) buffer. Empty instruction is fine. */
+function startGenerate() {
+  const buffer = view.state.doc.toString();
+  if (!noRunnableCode(buffer)) {
+    statusEl.textContent = 'New idea starts from an empty editor. Select some code and press ⌘/Ctrl+K to shape it instead.';
+    return;
+  }
+  const cap = generateCapture(buffer);
+  box.open(cap.range, (instruction) => submit(cap, 'generate', instruction), 'describe a vibe, or just press Enter');
+}
+
 /**
  * ⌘J / ⌘⇧J: find what is broken (the error's expression, else the selection or cursor line), only
  * because the user asked. A minimal fix of code that runs sends nothing. Takes a few ms in the worker.
  */
-async function startFix(mode: Exclude<Mode, 'shape'>) {
+async function startFix(mode: 'fix-minimal' | 'fix-rewrite') {
   const buffer = view.state.doc.toString();
   const sel = view.state.selection.main;
   const selection = sel.empty ? null : captureRange(view.state);
@@ -663,14 +694,30 @@ async function startFix(mode: Exclude<Mode, 'shape'>) {
 
 function submit(cap: Capture, mode: Mode, instruction: string, fix?: TrayFix) {
   if (!isRangeIntact(view.state.doc.toString(), cap.range, cap.text)) {
-    statusEl.textContent = 'The selection changed while the box was open. Press ⌘/Ctrl+K again.';
+    statusEl.textContent =
+      mode === 'generate' ? 'The editor changed while the box was open. Press ✨ New idea again.' : 'The selection changed while the box was open. Press ⌘/Ctrl+K again.';
     return;
   }
+  statusNote = null;
   history.add(instruction);
   liveRange = cap.range;
   send({ type: 'request', requestId: ++requestSeq, capture: cap, mode, instruction, ...(fix ? { fix } : {}) });
   trayEl.focus();
 }
+
+// The New idea empty state follows the text: typing code hides it, clearing the editor shows it again.
+view.dispatch({
+  effects: StateEffect.appendConfig.of(
+    EditorView.updateListener.of((update) => {
+      if (!update.docChanged) return;
+      if (statusNote === null) return renderEmptyState();
+      statusNote = null; // the next-step hint lasts until the first edit
+      render();
+    }),
+  ),
+});
+box.onToggle = () => renderEmptyState();
+document.getElementById('new-idea')!.addEventListener('click', () => startCapture('generate'));
 
 // Stale guard: carry the range through edits elsewhere; any edit inside it makes the options stale.
 view.dispatch({
@@ -836,14 +883,25 @@ actionsEl.addEventListener('click', (e) => {
 
 const KEYS_HINT = '⌘/Ctrl+K shape · ⌘/Ctrl+J fix · ⌘/Ctrl+⇧J rewrite · ⌘/Ctrl+⇧F format · Alt+P provider';
 
+/**
+ * New idea follows the text: the centred button shows only on an editor with nothing to run, with no
+ * tray, request or box open; the action bar's button is enabled with nothing to run and no tray.
+ */
+function renderEmptyState() {
+  const empty = noRunnableCode(view.state.doc.toString());
+  emptyStateEl.hidden = !(state.kind === 'playing' && !box.isOpen && empty);
+  generateButton.disabled = state.kind !== 'playing' || !empty;
+}
+
 function render() {
+  renderEmptyState();
   // As the keys: nothing starts mid-commit, and formatting waits for the tray to close.
-  for (const b of actionsEl.querySelectorAll('button')) {
+  for (const b of actionsEl.querySelectorAll<HTMLButtonElement>('button:not([data-action=generate])')) {
     b.disabled = state.kind === 'committed' || (b.dataset.action === 'format' && state.kind === 'tray');
   }
   const swap = `swap: ${quantizer.mode} (T)`;
   if (state.kind !== 'tray') {
-    statusEl.textContent = `${KEYS_HINT} · ${swap.replace('(T)', '(Alt+T)')}`;
+    statusEl.textContent = statusNote ?? `${KEYS_HINT} · ${swap.replace('(T)', '(Alt+T)')}`;
     // Check focus before hiding: hiding a focused element moves focus to <body>.
     const hadFocus = trayEl.contains(document.activeElement);
     trayEl.hidden = true;
@@ -855,16 +913,21 @@ function render() {
   trayEl.classList.toggle('is-stale', tray.stale);
 
   const broken = !!tray.fix?.broken;
-  const original = card(0, ['original', tray.heard === 0 ? 'heard' : ''], broken ? 'original (broken)' : 'original', codeHtml(tray.capture.text), {
-    title: tray.fix?.error ? `${tray.fix.error}${broken ? '\n0/Esc go back to what was playing before ⌘J.' : ''}` : undefined,
-  });
-  // A minimal fix shows the exact characters it changed; elsewhere a word diff reads better.
+  const generating = tray.mode === 'generate';
+  const original = generating
+    ? card(0, ['original', tray.heard === 0 ? 'heard' : ''], 'nothing', tray.capture.text.trim() ? codeHtml(tray.capture.text) : placeholder('empty editor'), {
+        title: '0/Esc stop listening and go back to the empty editor.',
+      })
+    : card(0, ['original', tray.heard === 0 ? 'heard' : ''], broken ? 'original (broken)' : 'original', codeHtml(tray.capture.text), {
+        title: tray.fix?.error ? `${tray.fix.error}${broken ? '\n0/Esc go back to what was playing before ⌘J.' : ''}` : undefined,
+      });
+  // A minimal fix shows the exact characters it changed; elsewhere a word diff reads better. A new idea has nothing to diff against.
   const granularity: DiffGranularity = tray.mode === 'fix-minimal' ? 'char' : 'word';
   const options = tray.slots
     .map((s, i) => ({ s, slot: i + 1 }))
     // A minimal fix usually has one option: don't show the unused second slot as "no option".
     .filter(({ s, slot }) => !(tray.mode === 'fix-minimal' && slot > 1 && s.status === 'empty'))
-    .map(({ s, slot }) => slotCard(slot, s, tray.heard, tray.capture.text, granularity));
+    .map(({ s, slot }) => slotCard(slot, s, tray.heard, generating ? null : tray.capture.text, granularity));
 
   const times = timing?.requestId === tray.requestId ? timing : null; // never show the previous request's times
   const ms = (v?: number) => (v === undefined ? '…' : v < 1000 ? `${Math.round(v)} ms` : `${(v / 1000).toFixed(1)} s`);
@@ -878,8 +941,10 @@ function render() {
       (stats.calls > 1 ? ` · ${stats.calls} calls` : '')
     : null;
   const fixing = tray.fix?.error ? `${tray.mode === 'fix-minimal' ? 'fixing' : 'rewriting'}: ${tray.fix.error.slice(0, 80)}${tray.fix.errorAt?.line ? ` (line ${tray.fix.errorAt.line})` : ''}` : null;
+  const idea = generating ? `new idea: ${tray.instruction.trim() ? tray.instruction.trim().slice(0, 80) : 'surprise me'}` : null;
   const status = [
     fixing,
+    idea,
     `provider: ${times?.provider ?? providerLabel(tray.mode, stats?.model)}`,
     `first ${ms(times?.firstMs)}`,
     `last ${tray.done ? ms(times?.lastMs) : '…'}`,
@@ -895,7 +960,9 @@ function render() {
     .join(' · ');
   const hint = tray.stale
     ? '<span class="stale">Selection changed — options are stale. Playing the original. Esc to close.</span>'
-    : '1–4 audition (Alt+1–4 from the editor) · 0/Esc original · Enter commit · R regenerate · Esc again closes';
+    : generating
+      ? 'Press 1–4 to listen · Enter keeps the one playing · 0 or Esc stops · R for four new ideas'
+      : '1–4 audition (Alt+1–4 from the editor) · 0/Esc original · Enter commit · R regenerate · Esc again closes';
   const error =
     (tray.error ? ` · <span class="stale">${escapeHtml(tray.error)}</span>` : '') +
     (tray.bufferError ? ` · <span class="stale" title="${escapeHtml(tray.bufferError)}">buffer has an error: ${escapeHtml(tray.bufferError.slice(0, 80))}</span>` : '');
@@ -929,7 +996,8 @@ function providerLabel(mode: Mode = 'shape', answered?: string) {
 
 const placeholder = (text: string) => `<span class="placeholder">${escapeHtml(text)}</span>`;
 
-function slotCard(slot: number, s: SlotCard, heard: Slot, original: string, granularity: DiffGranularity) {
+/** `original` null: show the option's code as it is (a new idea has nothing to compare with). */
+function slotCard(slot: number, s: SlotCard, heard: Slot, original: string | null, granularity: DiffGranularity) {
   const classes = [s.status, slot === heard ? 'heard' : ''];
   const why = s.drop ? reasonLabel(s.drop.reason, s.drop.message) : '';
   switch (s.status) {
@@ -957,7 +1025,8 @@ function slotCard(slot: number, s: SlotCard, heard: Slot, original: string, gran
       ]
         .filter(Boolean)
         .join('\n') || undefined;
-      return card(slot, classes, label, diffHtml(original, s.option!.code, granularity), { badges, title });
+      const body = original === null ? codeHtml(s.option!.code) : diffHtml(original, s.option!.code, granularity);
+      return card(slot, classes, label, body, { badges, title });
     }
   }
 }

@@ -4,16 +4,18 @@ import { EditorState } from '@codemirror/state';
 import { javascript } from '@codemirror/lang-javascript';
 import { ensureSyntaxTree } from '@codemirror/language';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { loadFixtures } from '../eval/fixtures';
+import { isFixMode, loadFixtures } from '../eval/fixtures';
 import { asksForSilence } from '../src/feedback';
 import { diagnoseFix } from '../src/fixTarget';
+import { noRunnableCode } from '../src/generate';
 import { Sandbox } from '../src/sandbox';
 import { Validator } from '../src/validator';
 
 const sounds = new Set(JSON.parse(readFileSync(fileURLToPath(new URL('../src/generated/sounds.json', import.meta.url)), 'utf8')) as string[]);
 const all = loadFixtures();
 const shape = all.filter((f) => f.mode === 'shape');
-const fix = all.filter((f) => f.mode !== 'shape');
+const fix = all.filter((f) => isFixMode(f.mode));
+const generate = all.filter((f) => f.mode === 'generate');
 
 let sandbox: Sandbox;
 beforeAll(async () => {
@@ -71,5 +73,19 @@ describe('eval fixtures: fix', () => {
     expect(d.error.stage).toBe(f.expect);
     expect(!!d.otherErrors).toBe(!!f.otherError);
     if (f.selection) expect(d.range).toEqual({ from: f.selection.from, to: f.selection.to });
+  });
+});
+
+describe('eval fixtures: generate', () => {
+  it('covers an empty instruction, genre, mood and specific requests, and a comments-only buffer', () => {
+    expect(generate.length).toBeGreaterThanOrEqual(5);
+    expect(generate.some((f) => f.instruction === '' && f.buffer === '')).toBe(true);
+    expect(generate.filter((f) => f.instruction).length).toBeGreaterThanOrEqual(3);
+    expect(generate.some((f) => f.buffer.trim().startsWith('//'))).toBe(true);
+  });
+
+  it.each(generate.map((f) => [f.id, f] as const))('%s: the buffer has no runnable code and the selection is all of it', (_id, f) => {
+    expect(noRunnableCode(f.buffer)).toBe(true);
+    expect(f.selection).toEqual({ from: 0, to: f.buffer.length, text: f.buffer });
   });
 });

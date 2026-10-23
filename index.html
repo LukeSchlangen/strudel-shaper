@@ -16,12 +16,18 @@
       <span id="status">Press Play (or Ctrl+Enter). Select code or put the cursor on a line, then press ⌘/Ctrl+K.</span>
     </header>
     <nav id="actions" aria-label="Actions">
+      <button type="button" data-action="generate" title="New idea (⌘/Ctrl+K on an empty editor)" aria-label="New idea">✨ New idea</button>
       <button type="button" data-action="shape" title="Shape (⌘/Ctrl+K)" aria-label="Shape (⌘/Ctrl+K)">Shape</button>
       <button type="button" data-action="fix-minimal" title="Fix (⌘/Ctrl+J)" aria-label="Fix (⌘/Ctrl+J)">Fix</button>
       <button type="button" data-action="fix-rewrite" title="Rewrite (⌘/Ctrl+⇧J)" aria-label="Rewrite (⌘/Ctrl+⇧J)">Rewrite</button>
       <button type="button" data-action="format" title="Format (⌘/Ctrl+⇧F)" aria-label="Format (⌘/Ctrl+⇧F)">Format</button>
     </nav>
-    <main id="editor-wrap"></main>
+    <main id="editor-wrap">
+      <div id="empty-state" hidden>
+        <button id="new-idea" type="button">✨ New idea</button>
+        <p>Not sure what to write? Describe a vibe, or just press Enter for a surprise.<br />You'll get four ideas to listen to. Keep the one you like.</p>
+      </div>
+    </main>
     <section id="tray" tabindex="0" hidden aria-label="Variation tray"></section>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -29,13 +29,14 @@ export interface RemoteProviderOptions {
  * Nothing here is specific to one model or vendor.
  */
 /**
- * `?fixModel=` / `?rewriteModel=` pick the model for ⌘J / ⌘⇧J; shape uses the selected one. Without
- * a parameter a fix mode is left to the proxy's per-mode default (null).
+ * `?fixModel=` / `?rewriteModel=` / `?generateModel=` pick the model for ⌘J / ⌘⇧J / New idea; shape
+ * uses the selected one. Without a parameter those modes are left to the proxy's per-mode default (null).
  */
 export function modelForMode(params: URLSearchParams, selected: string) {
   return (mode: Mode): string | null => {
     if (mode === 'fix-minimal') return params.get('fixModel') || null;
     if (mode === 'fix-rewrite') return params.get('rewriteModel') || null;
+    if (mode === 'generate') return params.get('generateModel') || null;
     return selected;
   };
 }

@@ -4,16 +4,17 @@ Strudel Shaper is a browser Strudel live-coding editor. The user selects code an
 - ⌘K **shapes** the selection.
 - ⌘J makes a **minimal fix**.
 - ⌘⇧J makes an **intent rewrite**.
+- **✨ New idea** (or ⌘K on an editor with no runnable code) **generates** four complete starter programs for a beginner. See "New idea: generate mode" at the end.
 
-Milestones 1–5 are done; the sections below are their history.
+Milestones 1–5 and New idea are done; the sections below are their history.
 
 ## Run it
 
 | What | How |
 | --- | --- |
 | App + model proxy | `npm run dev` (Vite on :5173, proxy on 127.0.0.1:8787). Put `ANTHROPIC_API_KEY` in `.env` (see `.env.example`). Open `http://localhost:5173/?provider=claude`. Without `?provider` it uses the offline mock. |
-| Tests, build, key scan | `npm test` (408 tests, no network), `npm run build`, `npm run check:key`. All three must pass before a commit. |
-| Eval (costs cents) | `npm run eval -- --model claude-haiku-5-5` (shape, 20 requests). `npm run eval -- --mode fix --model claude-haiku-5-5` (fix, 15 requests). Add `--only id,id` or `--label x`. Reports go to `eval/reports/`. |
+| Tests, build, key scan | `npm test` (489 tests, no network), `npm run build`, `npm run check:key`. All three must pass before a commit. |
+| Eval (costs cents) | `npm run eval -- --model claude-haiku-5-5` (shape, 20 requests). `npm run eval -- --mode fix --model claude-haiku-5-5` (fix, 15 requests). `npm run eval -- --mode generate --model claude-sonnet-5-5` (New idea, 5 requests). Add `--only id,id` or `--label x`. Reports go to `eval/reports/`. |
 | Listening | `http://localhost:5173/eval/listen.html` (dev server): N/P step through requests, 1–4 audition, 0 original. |
 | Prompt size | `npm run count:prompt` (free count_tokens endpoint) |
 | Reference | `npm run build:reference`. After a Strudel upgrade, first run `await __shaper.saveScope()` in the dev page. |
@@ -26,11 +27,12 @@ Milestones 1–5 are done; the sections below are their history.
 | Model, shape (⌘K) | the header select (Haiku 5.5 when `?provider=claude`) | `?model=`, Alt+P |
 | Model, ⌘J minimal fix | **Haiku 5.5** | `MODE_DEFAULT_MODELS` (`server/providers/models.ts`); `?fixModel=` |
 | Model, ⌘⇧J rewrite | **Sonnet 5.5** | same; `?rewriteModel=` |
+| Model, ✨ New idea (generate) | **Sonnet 5.5** (Gemini: 4 argon) | same; `?generateModel=` |
 | Thinking / effort | off / low, both models | `?thinking=` `?effort=` |
 | Strategy | `single` (one call per option set; fix modes always single) | `?strategy=parallel` (shape only) |
 | Swap timing | beat | T / Alt+T |
 | Warm-up | on, for the selected model | `?warmup=0` |
-| Limits | 4 options (2 for a minimal fix); `MAX_TOKENS` 2048; `RATE_LIMIT_PER_MIN` 20; 20 s upstream idle timeout | `.env` |
+| Limits | 4 options (2 for a minimal fix; generate always asks for 4); `MAX_TOKENS` 2048; `RATE_LIMIT_PER_MIN` 20; 20 s upstream idle timeout | `.env` |
 | Validation | 250 ms per check (`VALIDATION_TIMEOUT_MS`); fingerprints over 8 cycles (`FINGERPRINT_CYCLES`) | `src/validator.ts`, `src/sandbox.ts` |
 | Fix cards | char diff when ≤ 12 changed runs (`MAX_CHAR_CHANGES`); `large change` badge above 20 characters (`LARGE_CHANGE_CHARS`) | `src/diff.ts` |
 
@@ -39,7 +41,7 @@ Milestones 1–5 are done; the sections below are their history.
 - Import `@strudel/repl/repl-component.mjs`, never the package root. Keep the CodeMirror pins in `package.json` and `resolve.dedupe` in `vite.config.ts`.
 - **Auditioning:**
   - Audition with `mirror.repl.evaluate(code)`.
-  - The Quantizer quantizes only our own evaluations (and snapshot restores).
+  - The Quantizer quantizes only our own evaluations (and snapshot restores). A restore to a snapshot taken with the clock stopped stops the clock once the swap has landed.
   - An outside evaluation (Ctrl+Enter, Play) resets the tray.
   - Highlighting pauses and widgets are held while auditioning.
 - **Commit:** one `isolateHistory.of('full')` transaction, so one ⌘Z undoes it.
@@ -56,20 +58,20 @@ Milestones 1–5 are done; the sections below are their history.
 | --- | --- |
 | Wiring, keys, rendering | `src/main.ts`, `src/style.css` |
 | Tray state machine | `src/trayMachine.ts` (effects incl. `snapshotPlaying` / `restoreSnapshot`) |
-| Capture and fix targets | `src/capture.ts` (`captureRange`, `captureAt`), `src/fixTarget.ts` (`diagnoseFix`, `trayFix`, `noRequestReason`), `src/errorPosition.ts` |
+| Capture and fix targets | `src/generate.ts` (`noRunnableCode`, `generateCapture`), `src/capture.ts` (`captureRange`, `captureAt`), `src/fixTarget.ts` (`diagnoseFix`, `trayFix`, `noRequestReason`), `src/errorPosition.ts` |
 | Validation | `src/validator.ts` (shape and fix rules), `src/sandbox.ts` (worker realm, fingerprint), `src/validator.worker.ts`, `src/pipeline.ts` (retries), `src/feedback.ts` |
 | Audio timing | `src/quantize.ts` (`Quantizer`: `swapTo`, `playing`) |
 | Diffs | `src/diff.ts` (word / char diffs, `changeSize`) |
 | Providers | `src/provider.ts`, `src/remoteProvider.ts` (`modelForMode`), `src/mockProvider.ts` |
 | Proxy | `server/app.ts`, `server/prompt.ts`, `server/providers/claude.ts`, `server/providers/models.ts` |
-| Eval | `eval/run.ts`, `eval/fixtures.json` (20 shape + 15 fix requests), `eval/summary.ts`, `src/listen.ts` |
+| Eval | `eval/run.ts`, `eval/fixtures.json` (20 shape + 15 fix + 5 generate requests), `eval/summary.ts`, `src/listen.ts` |
 
 ## Live open problems
 
 Most important first. Details are in the milestone sections.
 
 1. **"Checked alone" cards can't be heard** while the buffer fails elsewhere: auditioning plays the whole spliced buffer (M4). This also covers fixes when the buffer has a second error. An "audition alone" mode is out of scope so far.
-2. **The warm-up only warms the selected model.** The first ⌘⇧J of a session (Sonnet) pays the prompt-cache write: about $0.02 and a slower first card (M5).
+2. **The warm-up only warms the selected model.** The first ⌘⇧J or New idea of a session (Sonnet) pays the prompt-cache write: about $0.02 and a slower first card (M5). For New idea this is often the *first* request a beginner makes.
 3. **Haiku often returns 3 shape options, not 4** (M4).
 4. **Models add numbers to control patterns** (`.add(2)` on `n(...)` or `note(...)`), which is a no-op in this Strudel version. The sounds-identical check now catches it and retries, but the reference could warn about it (M5).
 5. **Some broken code plays partly and isn't diagnosed as broken:** a bad chord name inside `<…>`, or `.gain("loud")`. ⌘J says "nothing to fix" (M5).
@@ -82,6 +84,7 @@ Most important first. Details are in the milestone sections.
 12. **Timing:** swap latency is fixed at about 150–250 ms by Strudel's look-ahead (M1). The `armed` window spans the whole async evaluate (M2). The Drawer's look-back after `settle()` sees the new pattern (M2).
 13. **Snapshots:** `src/generated/` and the sound summary are snapshots of the live scope; the summary lists only 12 drum machines in full (M4).
 14. **Eval and housekeeping:** the eval measures the proxy in-process, so network time is excluded (M4). Retries cost a full cached prompt each (M4). The worker isn't tested over hour-long sessions (M3). The mock runs out of transforms (M3). The bundle is 1.8 MB (M1).
+15. **New idea:** the starter code hides the button until the editor is cleared; undo after a commit leaves the idea playing; beginner readability is prompted, not checked; Haiku vs Sonnet not yet compared on the generate eval (New idea).
 
 ---
 
@@ -938,3 +941,47 @@ Use headphones. Run `npm run dev`, open `/?provider=claude`, then Ctrl+Enter.
 - **Rewrites of working code** are validated like shape mode, so a rewrite that sounds exactly like the original is retried. That's arguably right for "rewrite", but untested by ear.
 - **Seen once and not reproduced:** while two scripted test runs overlapped in the same page, the clock stopped (`[cyclist] stop`) with no app code running. In a clean run of all 8 broken-line cases, the clock never stopped.
 - **The reference doesn't warn** that `.add(number)` on `n()`/`note()` patterns does nothing. The sounds-identical check catches it after the fact, at the cost of a retry.
+
+---
+
+# New idea: generate mode
+
+A beginner who clears the editor, or doesn't know what to write, gets a **✨ New idea** button. It opens the instruction box; an empty submit gives four varied starting points, and notes ("chill lofi beat") give four takes on them. The options arrive in the normal tray: 1–4 audition, Enter keeps one, which fills the editor.
+
+## How it works
+
+- **When it shows:** `noRunnableCode(text)` (`src/generate.ts`): empty, whitespace, or only `//` / `/* */` comments. The centred button over the editor shows when that holds and there is no tray, request or open box. The narrow-screen action bar has a `generate` button, disabled when there is code or a tray. Both follow every edit (an update listener), not just tray events.
+- **⌘K** on such a buffer does the same as the button. With code, ⌘K is unchanged.
+- **Box:** the same `InstructionBox` and history, with its own placeholder ("describe a vibe, or just press Enter"; `open(range, submit, placeholder)`). On an empty range it anchors below line 1; on a comments-only buffer, below the last comment line.
+- **Capture:** the whole buffer, `0…length`. **Comments are replaced, not kept:** the model sees them inside the markers and the prompt tells it to treat them as notes, like an instruction. One ⌘Z brings them back.
+- **Request:** `mode: 'generate'` through `Provider` → `RemoteProvider` → NDJSON → proxy, like the fix modes. 4 slots (`slotCount`); always one call (the parallel strategy's direction hints are shape-only).
+- **Prompt:** a `## Mode: generate` section in the cached `ROLE`. Complete 3–10-line programs that play at once; beginner-readable (common functions, one `stack` of 2–4 layers, no variables); four genuinely different ideas without an instruction, four takes with one; comments are notes; labels name the idea. Two shared rules gained a generate exception: the selection's "role and form" is a whole program, and setting the tempo is allowed. User message: `Instruction: none. Offer four different starting ideas.`
+  - **Cost:** role and rules **1,541 → 1,967 tokens (+426)**; system block 1 **6,031 → 6,457** (`npm run count:prompt`). Cached, so it costs on every cache write and as cache reads.
+- **Validation:** the pipeline skips the baseline for generate, as it does for fix modes (there is no original to sound like), so no fingerprint and no "sounds identical" check. The `empty` and `unknown-sample` retries still apply. Returning the comments unchanged is still `identical` by text.
+- **Model:** **Sonnet 5.5** (`MODE_DEFAULT_MODELS.generate`; Gemini 4 argon). `?generateModel=` overrides it. Reasoning: this is a beginner's first impression, and it happens once per idea, not on every tweak. Rewrite (the closest task: four whole interpretations) needed Sonnet to fill four working cards on the first try, while Haiku often returns 3 (open problem 3). Latency is less critical than for shape, since cards stream in and the user then listens for a while. One browser request (2026-10-23, cache warm): first card 2.3 s, last 6.1 s, 771 output tokens, $0.0089, 4/4 ready first try. Not yet measured: Haiku on the generate fixtures. Run both and compare.
+- **Mock:** six short beginner programs (`IDEAS` in `src/mockProvider.ts`), matching instruction words first ("lofi", "acid", "ambient"…); a replacement is an idea not offered yet; faults break the planned program. Each idea is checked in the sandbox in `test/generate.test.ts`.
+
+## Auditioning with nothing playing
+
+The beginner has probably never pressed Play, and an empty buffer has nothing to play.
+- The tray uses the **snapshot** path that broken-code fixes use: `restoresSnapshot` is true for generate. When the tray opens, `snapshotPlaying` records what is playing (silence on a stopped clock) and whether the clock was running.
+- Pressing 1–4 auditions with `repl.evaluate`, which **autostarts the clock**, so the first press makes sound with no Play. `getAudioContext().resume()` runs first when the clock is stopped; the keypress or click is the user gesture.
+- **0 / Esc** (and a live `evalFailed`) restore the snapshot through the quantizer, on the beat. If the clock was stopped when the tray opened, it is **stopped again once that swap lands**, unless something was evaluated since. This now also applies to fix modes opened on a stopped clock (before, the clock kept running silence).
+- **Enter** writes the option in one `isolateHistory.of('full')` transaction, with the cursor at the start (not a whole-buffer selection that the next keypress would replace), and evaluates the editor. The status line then says "Your idea is playing. Select a line and press ⌘/Ctrl+K (or tap Shape) to shape it." until the next edit.
+- Card 0 reads **"nothing"** ("empty editor", or the comments); options show their code, not a diff against nothing.
+
+## Verified (2026-10-23)
+
+- `npm test` (489), `npm run build`, `npm run check:key` pass.
+- **Mock, headless Chrome (muted), 1280 px and 390 px:** clear → button (or action-bar button) → box → Enter → 4 cards → 1, 2 (clock starts from stopped, onsets queued) → Esc/Original (clock stopped, editor empty) → 3 → Enter/Accept (editor filled, cursor at 0, hint shown) → ⌘Z (empty again, button back). ⌘K on empty opens the generate box; on `// comment` the button stays; typing code hides it; ⌘K with code opens the shape box. Comments plus "chill" gave lofi and ambient first.
+- **`?provider=claude`:** one request as above. Esc after auditioning all four stopped the clock.
+- **Not verified:** by ear (runs were muted), on a real phone/touch device, Safari/Firefox, and the generate eval (paid, not run).
+
+## Open problems
+
+- **Undo after a commit leaves the idea playing** with an empty editor (as any undo does in Strudel; nothing re-evaluates). Press Stop.
+- **The first New idea of a session pays the Sonnet cache write** (see live problem 2). Warming Sonnet when the page opens on an empty buffer would fix it, but the starter code isn't empty, so it rarely applies.
+- **The starter code hides the feature:** a new user sees the starter and only finds New idea after clearing it. Not changed (out of scope); worth deciding.
+- **Beginner readability is only prompted, not checked.** The one real run had `lpf(sine.range(400,1200).slow(8))`, `swingBy(1/3, 4)` and a bad chord note (`bd3` inside `[g2,bd3,d3]`, which still plays partly; see live problem 5).
+- **Gemini generate** was not exercised.
+

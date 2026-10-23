@@ -101,7 +101,8 @@ export type Effect =
   | { type: 'snapshotPlaying' }
   /** …and go back to it (0/Esc), quantized like any swap, instead of evaluating the broken original. */
   | { type: 'restoreSnapshot' }
-  | { type: 'commit'; capture: Capture; code: string };
+  /** `mode`: generate puts the cursor at the start instead of selecting the whole new buffer. */
+  | { type: 'commit'; capture: Capture; code: string; mode: Mode };
 
 export interface Transition {
   state: TrayState;
@@ -110,7 +111,7 @@ export interface Transition {
 
 export const initialState: TrayState = { kind: 'playing' };
 
-/** Shape and rewrite: 3–4 options. A minimal fix is 1 option, 2 when the intent is ambiguous. */
+/** Shape, rewrite and generate: 3–4 options. A minimal fix is 1 option, 2 when the intent is ambiguous. */
 export const slotCount = (mode: Mode) => (mode === 'fix-minimal' ? 2 : 4);
 
 const stay = (state: TrayState): Transition => ({ state, effects: [] });
@@ -125,8 +126,11 @@ function openTray(req: TrayRequest, requestId: number): Transition {
   };
 }
 
-/** The original can't be evaluated, so "back to the original" means back to what played before the tray. */
-const restoresSnapshot = (t: { fix?: TrayFix }) => !!t.fix?.broken;
+/**
+ * The original can't be evaluated (broken code, or an empty editor for generate), so "back to the
+ * original" means back to what played before the tray.
+ */
+const restoresSnapshot = (t: { fix?: TrayFix; mode: Mode }) => !!t.fix?.broken || t.mode === 'generate';
 
 export function transition(state: TrayState, event: TrayEvent): Transition {
   switch (state.kind) {
@@ -242,7 +246,7 @@ function trayTransition(state: Tray, event: TrayEvent): Transition {
         state: { kind: 'committed', capture: state.capture, option },
         effects: [
           ...abort,
-          { type: 'commit', capture: state.capture, code: option.code },
+          { type: 'commit', capture: state.capture, code: option.code, mode: state.mode },
           { type: 'evaluateEditor' },
           { type: 'resumeHighlight' },
         ],

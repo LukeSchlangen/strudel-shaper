@@ -72,7 +72,8 @@ export async function runRequest(
   // One validation at a time, in arrival order: "duplicate" means the same as one accepted before it.
   // The baseline goes first, so every option is judged against it.
   let baseline: Baseline | undefined;
-  let queue: Promise<unknown> = validator.baseline && !fix
+  // No baseline in fix modes (the original is broken) or generate (there is no original to sound like).
+  let queue: Promise<unknown> = validator.baseline && !fix && req.mode !== 'generate'
     ? validator
         .baseline(deps.getBuffer())
         .then((b) => {

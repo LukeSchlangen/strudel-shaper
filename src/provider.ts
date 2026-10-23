@@ -1,5 +1,5 @@
 /** The interface real models plug into. The model returns code and short labels only. */
-export type Mode = 'shape' | 'fix-minimal' | 'fix-rewrite';
+export type Mode = 'shape' | 'fix-minimal' | 'fix-rewrite' | 'generate';
 
 export interface OptionRequest {
   mode: Mode;

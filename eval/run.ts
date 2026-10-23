@@ -1,7 +1,7 @@
 /**
  * The eval harness: every fixture request through the real provider and the real validator.
  *
- *   npm run eval -- --provider claude --model claude-haiku-5-5 [--mode shape|fix] [--effort low|medium|high]
+ *   npm run eval -- --provider claude --model claude-haiku-5-5 [--mode shape|fix|generate] [--effort low|medium|high]
  *                   [--thinking off|adaptive] [--strategy single|parallel] [--warmup]
  *                   [--only drums-kick,bass-darker] [--label name] [--schema-key k]
  *
@@ -9,7 +9,8 @@
  * network or rate limit), so options take exactly the browser's path: NDJSON lines → runRequest →
  * Validator → a sandbox in a worker_threads worker (WorkerBackend, with its 250 ms pre-emption).
  * `--mode fix` runs the ⌘J / ⌘⇧J fixtures: each request is built by diagnoseFix (the browser's own
- * code) from the fixture's selection or cursor, and validated with the fix rules.
+ * code) from the fixture's selection or cursor, and validated with the fix rules. `--mode generate` runs the
+ * New idea fixtures: the whole (empty or comments-only) buffer is replaced, with no baseline.
  * Writes eval/reports/<stamp>-<label>.json (for eval/listen.html) and a .md summary next to it.
  * Requests run one after another so their timings don't interfere.
  */
@@ -30,7 +31,7 @@ import { RemoteProvider } from '../src/remoteProvider';
 import { summariseSounds, COMMON_DRUMS } from '../src/soundSummary';
 import type { TrayEvent } from '../src/trayMachine';
 import { Validator, WorkerBackend, type WorkerLike, type WorkerRequest, type WorkerResponse } from '../src/validator';
-import { isFixMode, loadFixtures, type Fixture } from './fixtures';
+import { evalGroup, isFixMode, loadFixtures, type Fixture } from './fixtures';
 import { summarise, type Report, type RequestResult, type SlotResult } from './summary';
 
 const root = new URL('..', import.meta.url);
@@ -46,7 +47,7 @@ function parseArgs(args: string[]) {
   return {
     provider,
     model,
-    mode: (get('mode') ?? 'shape') as 'shape' | 'fix',
+    mode: (get('mode') ?? 'shape') as 'shape' | 'fix' | 'generate',
     effort: get('effort') as Effort | undefined,
     thinking: get('thinking') as ThinkingSetting | undefined,
     strategy: get('strategy') as Strategy | undefined,
@@ -99,7 +100,7 @@ export async function main(argv: string[]) {
   const settings = { effort: opts.effort, thinking: opts.thinking, strategy: opts.strategy };
   const provider = new RemoteProvider({ provider: opts.provider, model: opts.model, fetch: appFetch, sounds: () => sounds, settings: () => settings });
 
-  const label = opts.label ?? [opts.mode === 'fix' ? 'fix' : '', opts.model.replace(/^(claude|gemini)-/, ''), opts.thinking ?? 'default', opts.effort ?? 'default', opts.strategy ?? 'single', opts.warmup ? 'warm' : ''].filter(Boolean).join('-');
+  const label = opts.label ?? [opts.mode === 'shape' ? '' : opts.mode, opts.model.replace(/^(claude|gemini)-/, ''), opts.thinking ?? 'default', opts.effort ?? 'default', opts.strategy ?? 'single', opts.warmup ? 'warm' : ''].filter(Boolean).join('-');
   console.log(`[eval] ${label}`);
 
   let warmupMs: number | undefined;
@@ -110,7 +111,7 @@ export async function main(argv: string[]) {
     console.log(`[eval] warm-up ${Math.round(warmupMs)} ms`, await res.json());
   }
 
-  const fixtures = loadFixtures().filter((f) => (opts.mode === 'fix') === isFixMode(f.mode) && (!opts.only || opts.only.includes(f.id)));
+  const fixtures = loadFixtures().filter((f) => evalGroup(f.mode) === opts.mode && (!opts.only || opts.only.includes(f.id)));
   const results: RequestResult[] = [];
   for (const [i, f] of fixtures.entries()) {
     cps = Number(/setcps\(([\d.]+)\)/.exec(f.buffer)?.[1] ?? 0.5);
@@ -240,6 +241,8 @@ async function runOne(f: Fixture, provider: RemoteProvider, validator: Validator
     selection,
     instruction: f.instruction,
     ...(diagnosis ? { diagnosis, originalBroken: fix?.broken } : {}),
+    // An empty editor doesn't evaluate either: the listening page's 0 goes back to silence.
+    ...(f.mode === 'generate' ? { originalBroken: true } : {}),
     firstArrivalMs,
     firstCardMs,
     lastSettledMs,

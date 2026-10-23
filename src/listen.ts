@@ -132,7 +132,8 @@ function render() {
   const mine = notes[r.id] ?? { ratings: {}, note: '' };
   const card = (slot: number, label: string, body: string, extra = '') =>
     `<div class="card ${slot === heard ? 'heard' : ''}" data-slot="${slot}"><b>${slot}</b> ${esc(label)}${extra}<code>${body}</code></div>`;
-  const cards = [card(0, r.originalBroken ? 'original (broken)' : 'original', esc(r.selection.text))];
+  const generate = r.mode === 'generate';
+  const cards = [card(0, generate ? 'nothing' : r.originalBroken ? 'original (broken)' : 'original', esc(r.selection.text))];
   const granularity: DiffGranularity = r.mode === 'fix-minimal' ? 'char' : 'word';
   r.slots.forEach((s, i) => {
     const slot = i + 1;
@@ -147,7 +148,7 @@ function render() {
       .join('');
     const rating = `<select data-rate="${slot}">${['', 'great', 'good', 'meh', 'bad', 'broken'].map((v) => `<option ${mine.ratings[slot] === v ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
     const size = s.changeSize !== undefined && granularity === 'char' ? ` <small>${s.changeSize} ch</small>` : '';
-    cards.push(card(slot, s.label ?? '', diff(r.selection.text, s.code, granularity), badges + size + rating));
+    cards.push(card(slot, s.label ?? '', generate ? esc(s.code) : diff(r.selection.text, s.code, granularity), badges + size + rating));
   });
   trayEl.innerHTML = `<div class="meta">1–4 audition · 0 original · N/P request · T swap: ${quantizer.mode} · ${ready(r).length} cards</div><div class="cards">${cards.join('')}</div><textarea id="notes" rows="2" placeholder="Notes for this request">${esc(mine.note)}</textarea>`;
   trayEl.querySelectorAll<HTMLSelectElement>('select[data-rate]').forEach((sel) =>

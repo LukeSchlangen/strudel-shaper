@@ -6,7 +6,7 @@ export interface Fixture {
   bufferId: string;
   buffer: string;
   mode: Mode;
-  /** An explicit selection. Fix fixtures may have none and give `cursor` instead (⌘J with only a cursor). */
+  /** An explicit selection. Fix fixtures may have none and give `cursor` instead (⌘J with only a cursor). Generate: the whole buffer. */
   selection: { from: number; to: number; text: string } | null;
   /** Where the cursor is, for fixtures without a selection. */
   cursor: number;
@@ -34,7 +34,9 @@ export function loadFixtures(): Fixture[] {
     const mode = (r.mode ?? 'shape') as Mode;
     let selection: Fixture['selection'] = null;
     let cursor = 0;
-    if (r.selection !== undefined) {
+    if (mode === 'generate') {
+      selection = { from: 0, to: buffer.length, text: buffer };
+    } else if (r.selection !== undefined) {
       const from = find(r.selection, 'selection');
       selection = { from, to: from + r.selection.length, text: r.selection };
       cursor = from;
@@ -47,4 +49,7 @@ export function loadFixtures(): Fixture[] {
   });
 }
 
-export const isFixMode = (mode: Mode) => mode !== 'shape';
+export const isFixMode = (mode: Mode) => mode === 'fix-minimal' || mode === 'fix-rewrite';
+
+/** Which `--mode` of the eval runs a fixture. */
+export const evalGroup = (mode: Mode): 'shape' | 'fix' | 'generate' => (isFixMode(mode) ? 'fix' : mode === 'generate' ? 'generate' : 'shape');

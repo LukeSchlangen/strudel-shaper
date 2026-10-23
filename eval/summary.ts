@@ -27,7 +27,7 @@ export interface RequestResult {
   instruction: string;
   /** Fix modes: what diagnoseFix found. */
   diagnosis?: { kind: string; stage?: string; message?: string; line?: number; otherError?: boolean };
-  /** Fix modes: the original doesn't evaluate (card 0 is "original (broken)"). */
+  /** Fix modes: the original doesn't evaluate (card 0 is "original (broken)"). Always set for generate. */
   originalBroken?: boolean;
   /** First option from the provider, before validation. */
   firstArrivalMs?: number;
@@ -111,8 +111,23 @@ export function summarise(report: Report): string {
   ];
   const sameSound = r.flatMap((x) => [...x.retries, ...x.drops]).filter((y) => y.reason === 'identical' && /sounds exactly/.test(y.message)).length;
   lines.push(`- Sounds the same as the original (fingerprint): ${sameSound} retried or dropped`);
-  if (r.some((x) => x.mode && x.mode !== 'shape')) lines.push('', ...fixSummary(r));
+  if (r.some((x) => x.mode === 'fix-minimal' || x.mode === 'fix-rewrite')) lines.push('', ...fixSummary(r));
+  if (r.some((x) => x.mode === 'generate')) lines.push('', ...generateSummary(r));
   return lines.join('\n') + '\n';
+}
+
+/** Generate runs: the ideas each request got, so variety can be read at a glance (the listening page plays them). */
+function generateSummary(r: RequestResult[]): string[] {
+  const cell = (v: string) => v.replace(/\|/g, '\\|').replace(/\n/g, ' ⏎ ');
+  const lines = (code?: string) => (code ? code.split('\n').length : 0);
+  return [
+    '| Request | Instruction | Cards | Labels | Lines per card | Retries |',
+    '| --- | --- | --- | --- | --- | --- |',
+    ...r.map((x) => {
+      const ready = x.slots.filter((s) => s.status === 'ready');
+      return `| ${x.id} | ${cell(x.instruction || '(none)')} | ${ready.length}/${x.slots.length} | ${ready.map((s) => cell(s.label ?? '')).join(', ')} | ${ready.map((s) => lines(s.code)).join(', ')} | ${x.retries.map((y) => y.reason).join(', ')} |`;
+    }),
+  ];
 }
 
 /** A card that fixes the request: it passed the fix test (whole buffer works, or alone when the buffer has another error) and sounds. */

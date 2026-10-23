@@ -53,18 +53,22 @@ export const DEFAULT_MODEL = 'claude-haiku-5-5';
 export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
 
 /**
- * The model for each mode when the browser doesn't name one (NOTES.md, milestone 5).
+ * The model for each mode when the browser doesn't name one (NOTES.md, milestone 5 and "New idea").
+ * Generate is a beginner's first impression and happens once per idea, not on every tweak, so it
+ * uses the stronger model, as rewrite does.
  */
 export const MODE_DEFAULT_MODELS: Record<string, string> = {
   shape: DEFAULT_MODEL,
   'fix-minimal': 'claude-haiku-5-5',
   'fix-rewrite': 'claude-sonnet-5-5',
+  generate: 'claude-sonnet-5-5',
 };
 
 export const GEMINI_MODE_DEFAULT_MODELS: Record<string, string> = {
   shape: DEFAULT_GEMINI_MODEL,
   'fix-minimal': 'gemini-3.5-flash-lite',
   'fix-rewrite': 'gemini-4-argon',
+  generate: 'gemini-4-argon',
 };
 
 export function defaultModelFor(provider: string, mode: string): string {

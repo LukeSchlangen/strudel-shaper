@@ -7,10 +7,14 @@ import type { Range } from './splice';
  * A single-line instruction input shown as a CodeMirror tooltip just below the captured range,
  * so it follows scrolling. Enter submits (empty is fine), Esc or blur cancels, Up/Down browse history.
  */
+export const DEFAULT_PLACEHOLDER = 'instruction · Enter sends (empty ok) · Esc cancels';
+
 export class InstructionBox {
   private readonly setPos = StateEffect.define<number | null>();
   private readonly input = document.createElement('input');
   private onSubmit: ((instruction: string) => void) | null = null;
+  /** Called after the box opens or closes. */
+  onToggle: (() => void) | null = null;
 
   constructor(
     private readonly view: EditorView,
@@ -20,7 +24,7 @@ export class InstructionBox {
     const dom = document.createElement('div');
     dom.className = 'shaper-instruction';
     this.input.type = 'text';
-    this.input.placeholder = 'instruction · Enter sends (empty ok) · Esc cancels';
+    this.input.placeholder = DEFAULT_PLACEHOLDER;
     this.input.spellcheck = false;
     dom.append(this.input);
     const tooltip = (pos: number): Tooltip => ({
@@ -58,22 +62,26 @@ export class InstructionBox {
     return node === this.input;
   }
 
-  open(range: Range, onSubmit: (instruction: string) => void) {
-    // Below the selection's last line, lined up with its first non-blank character.
+  open(range: Range, onSubmit: (instruction: string) => void, placeholder = DEFAULT_PLACEHOLDER) {
+    // Below the selection's last line, lined up with its first non-blank character. An empty
+    // range (an empty buffer) gives its own position: below line 1.
     const doc = this.view.state.doc;
     const last = doc.lineAt(range.to);
     const pos = doc.lineAt(range.from).number === last.number ? range.from : last.from + (last.text.length - last.text.trimStart().length);
     this.onSubmit = onSubmit;
     this.input.value = '';
+    this.input.placeholder = placeholder;
     this.history.reset();
     this.view.dispatch({ effects: this.setPos.of(pos) });
     this.input.focus(); // already mounted when reopening
+    this.onToggle?.();
   }
 
   close() {
     if (!this.isOpen) return;
     this.onSubmit = null;
     this.view.dispatch({ effects: this.setPos.of(null) });
+    this.onToggle?.();
   }
 
   private keydown(e: KeyboardEvent) {

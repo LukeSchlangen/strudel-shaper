@@ -21,7 +21,9 @@
     "chords-sketch-bass": "setcps(0.45)\nstack(\n  chord(\"<Cm7 Fm7 Bb7 Ebmaj7>\").voicing().s(\"gm_epiano1\").room(0.3),\n  note(\"<Cm7 Fm7 Bb7 Ebmaj7>\").s(\"triangle\").gain(0.8),\n  s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\")\n)",
     "melody-sketch-arp": "setcps(0.5)\nstack(\n  n([0, 2, 4, [5, 7]]).scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5),\n  note(\"d2 ~ a1 ~\").s(\"sawtooth\").lpf(500),\n  s(\"bd ~ sd ~, hh*8\")\n)",
     "drums-sketch-euclid": "setcps(0.5)\nstack(\n  s(\"bd*4\"),\n  s(\"~ sd ~ sd\").bank(\"tr909\"),\n  s(\"hh*8\").gain(0.5),\n  s(\"cp\").euclid(3).gain(0.4)\n)",
-    "chords-sketch-names": "setcps(0.45)\nstack(\n  note(\"Cm7 Fm7\").voicing().s(\"gm_epiano1\").room(0.3),\n  note(\"<c2 f2 bb1 eb2>\").s(\"triangle\").gain(0.8),\n  s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\")\n)"
+    "chords-sketch-names": "setcps(0.45)\nstack(\n  note(\"Cm7 Fm7\").voicing().s(\"gm_epiano1\").room(0.3),\n  note(\"<c2 f2 bb1 eb2>\").s(\"triangle\").gain(0.8),\n  s(\"bd ~ ~ bd, ~ sd\").bank(\"rolandtr808\")\n)",
+    "empty": "",
+    "comments-only": "// my first track\n// something with a bassline, slow\n"
   },
   "requests": [
     { "id": "drums-kick", "buffer": "drums", "selection": "s(\"bd*4\")", "instruction": "" },
@@ -64,6 +66,11 @@
     { "id": "rewrite-arp", "buffer": "melody-sketch-arp", "mode": "fix-rewrite", "selection": "n([0, 2, 4, [5, 7]]).scale(\"D:dorian\").s(\"square\").lpf(1800).gain(0.5)", "instruction": "", "expect": "silent" },
     { "id": "fix-single-quotes", "buffer": "drums-single-quotes", "mode": "fix-minimal", "selection": "s('bd [~ bd] sd ~').bank(\"tr909\")", "instruction": "", "expect": "unknown-sample" },
     { "id": "rewrite-euclid", "buffer": "drums-sketch-euclid", "mode": "fix-rewrite", "selection": "s(\"cp\").euclid(3).gain(0.4)", "instruction": "", "expect": "eval" },
-    { "id": "rewrite-chord-names", "buffer": "chords-sketch-names", "mode": "fix-rewrite", "selection": "note(\"Cm7 Fm7\").voicing().s(\"gm_epiano1\").room(0.3)", "instruction": "play these chords as stabs", "expect": "silent" }
+    { "id": "rewrite-chord-names", "buffer": "chords-sketch-names", "mode": "fix-rewrite", "selection": "note(\"Cm7 Fm7\").voicing().s(\"gm_epiano1\").room(0.3)", "instruction": "play these chords as stabs", "expect": "silent" },
+    { "id": "generate-empty", "buffer": "empty", "mode": "generate", "instruction": "" },
+    { "id": "generate-genre", "buffer": "empty", "mode": "generate", "instruction": "chill lofi beat" },
+    { "id": "generate-mood", "buffer": "empty", "mode": "generate", "instruction": "something dreamy" },
+    { "id": "generate-specific", "buffer": "empty", "mode": "generate", "instruction": "a slow bassline with a simple kick and hi-hats" },
+    { "id": "generate-comments", "buffer": "comments-only", "mode": "generate", "instruction": "" }
   ]
 }

@@ -56,6 +56,54 @@ export function pickTransforms(instruction: string, rand: () => number, count = 
   return [...shuffle(biased, rand), ...shuffle(rest, rand)].slice(0, count);
 }
 
+interface Idea {
+  label: string;
+  code: string;
+  /** Instruction words that bring this idea forward. */
+  words: RegExp;
+}
+
+/** Generate mode: short beginner programs, each checked in the sandbox in test/mockProvider.test.ts. */
+export const IDEAS: Idea[] = [
+  {
+    label: 'four on the floor',
+    code: 'setcps(0.55)\nstack(\n  s("bd*4"),\n  s("~ cp ~ cp"),\n  s("[~ hh]*4").gain(0.6)\n)',
+    words: /\b(house|dance|club|disco|floor)\b/i,
+  },
+  {
+    label: 'dusty lofi beat',
+    code: 'setcps(0.4)\nstack(\n  s("bd ~ ~ bd ~ ~ bd ~"),\n  s("~ sd").room(0.3),\n  s("hh*8").gain(0.4),\n  note("<c3 a2 f2 g2>").s("piano").room(0.5)\n)',
+    words: /\b(lo-?fi|chill|relax\w*|study|dusty|slow)\b/i,
+  },
+  {
+    label: 'acid bassline',
+    code: 'setcps(0.6)\nstack(\n  s("bd*4"),\n  note("c2 c2 eb2 c2 g1 c2 bb1 c2").s("sawtooth").lpf("<400 800 1600 800>").lpq(10)\n)',
+    words: /\b(acid|bass\w*|squelch\w*)\b/i,
+  },
+  {
+    label: 'ambient pad',
+    code: 'setcps(0.25)\nnote("<[c3,e3,g3,b3] [a2,c3,e3,g3]>").s("triangle").room(0.8).gain(0.5)',
+    words: /\b(ambient|calm|pad|dreamy|slow|chill)\b/i,
+  },
+  {
+    label: 'simple melody',
+    code: 'setcps(0.5)\nstack(\n  n("0 2 4 7 4 2").scale("C:major").s("sine"),\n  s("bd ~ sd ~")\n)',
+    words: /\b(melody|tune|happy|bright|notes?)\b/i,
+  },
+  {
+    label: 'techno pulse',
+    code: 'setcps(0.6)\nstack(\n  s("bd*4"),\n  s("~ oh ~ oh").gain(0.5),\n  note("c2*8").s("square").lpf(600).gain(0.6)\n)',
+    words: /\b(techno|dark|fast|pulse|driving)\b/i,
+  },
+];
+
+/** Ideas whose words match the instruction first (shuffled), then the rest (shuffled). */
+export function pickIdeas(instruction: string, rand: () => number, count = SHAPE_COUNT): Idea[] {
+  const matching = IDEAS.filter((i) => i.words.test(instruction));
+  const rest = IDEAS.filter((i) => !matching.includes(i));
+  return [...shuffle(matching, rand), ...shuffle(rest, rand)].slice(0, count);
+}
+
 export type Sleep = (ms: number, signal: AbortSignal) => Promise<void>;
 
 /** Resolves after `ms`, or early (without rejecting) if the signal aborts. */
@@ -155,13 +203,16 @@ export class MockProvider implements Provider {
     const append = (suffix: string) => body + suffix + tail[0];
     const delay = () => this.minDelayMs + rand() * (this.maxDelayMs - this.minDelayMs);
     const clean: Option[] = [];
+    // Generate replaces the whole buffer, so a fault breaks the planned program, not the selection.
+    const generate = req.mode === 'generate';
 
-    const fault = (kind: FaultKind): Omit<Option, 'id'> | null => {
+    const fault = (kind: FaultKind, program?: string): Omit<Option, 'id'> | null => {
+      const append = (suffix: string) => (program !== undefined ? program + suffix : body + suffix + tail[0]);
       switch (kind) {
         case 'syntax':
           // An unclosed paren, or drop the closing quote of the first string.
-          if (faultRand() < 0.5 || !/"[^"]*"/.test(body)) return { label: 'unclosed paren', code: append('.fast(2') };
-          return { label: 'unclosed quote', code: body.replace(/"([^"]*)"/, '"$1') + tail[0] };
+          if (faultRand() < 0.5 || !/"[^"]*"/.test(program ?? body)) return { label: 'unclosed paren', code: append('.fast(2') };
+          return { label: 'unclosed quote', code: program !== undefined ? program.replace(/"([^"]*)"/, '"$1') : body.replace(/"([^"]*)"/, '"$1') + tail[0] };
         case 'unknown-function':
           return { label: 'wobble', code: append('.wobble(2)') };
         case 'unknown-sample':
@@ -183,17 +234,24 @@ export class MockProvider implements Provider {
     const maybeFault = (option: Omit<Option, 'id'>, forced?: FaultKind): [Omit<Option, 'id'>, FaultKind?] => {
       if (!forced && !(faultRand() < this.faultRate)) return [option];
       let kind = forced ?? this.faultKind ?? FAULT_KINDS[Math.floor(faultRand() * FAULT_KINDS.length)];
-      let broken = fault(kind);
+      const program = generate ? option.code : undefined;
+      let broken = fault(kind, program);
       if (!broken) {
         // Nothing to duplicate yet: use the next kind instead.
         kind = FAULT_KINDS[(FAULT_KINDS.indexOf(kind) + 1) % FAULT_KINDS.length];
-        broken = fault(kind)!;
+        broken = fault(kind, program)!;
       }
       return [broken, kind];
     };
 
     let planned: Array<Omit<Option, 'id'>>;
-    if (req.feedback) {
+    if (generate) {
+      // A replacement is an idea not offered yet; a full request is four ideas, matching ones first.
+      const ideas = req.feedback ? [IDEAS.find((i) => !this.taken.has(i.code)) ?? IDEAS[0]] : pickIdeas(req.instruction, rand);
+      planned = ideas.map((i) => ({ label: i.label, code: i.code }));
+      if (req.feedback) this.taken.add(planned[0].code);
+      else this.taken = new Set(planned.map((p) => p.code));
+    } else if (req.feedback) {
       // A replacement for one failed option: one option, valid unless retryFails.
       const candidates = req.mode === 'shape' ? shuffle(TRANSFORMS, rand) : FIX_CANDIDATES;
       const fresh = candidates.find((t) => !this.taken.has(append(t.suffix))) ?? candidates[0];

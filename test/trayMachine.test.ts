@@ -104,7 +104,7 @@ describe('tray state machine: milestone 1 behaviour', () => {
     const t1 = after(ready, [{ type: 'audition', slot: 2 }, { type: 'enter' }]);
     expect(t1.state).toEqual({ kind: 'committed', capture, option: opt(2) });
     expect(t1.effects.slice(-3)).toEqual([
-      { type: 'commit', capture, code: 'abc.o2()' },
+      { type: 'commit', capture, code: 'abc.o2()', mode: 'shape' },
       { type: 'evaluateEditor' },
       { type: 'resumeHighlight' },
     ]);
