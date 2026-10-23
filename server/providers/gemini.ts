@@ -1,8 +1,8 @@
-import type { GenerateContentConfig, GenerateContentParameters, GenerateContentResponse } from '@google/genai';
-import { addUsage, emptyUsage, type RemoteLine, type RemoteRequest, type Usage } from '../../src/remoteProtocol';
+import { ThinkingLevel, Type, type GenerateContentConfig, type GenerateContentParameters, type GenerateContentResponse, type Schema } from '@google/genai';
+import { addUsage, emptyUsage, type Effort, type RemoteLine, type RemoteRequest, type ThinkingSetting, type Usage } from '../../src/remoteProtocol';
 import { mapError } from '../errors';
 import { OptionStreamParser } from '../jsonStream';
-import { DIRECTIONS, optionSchema, soundsSystem, staticSystem, userMessage, type UserMessageOptions } from '../prompt';
+import { DIRECTIONS, soundsSystem, staticSystem, userMessage, type UserMessageOptions } from '../prompt';
 import { MODELS, costUsd, type ModelInfo } from './models';
 import { MAX_OPTIONS, cleanOption, maxOptionsFor } from './postprocess';
 
@@ -37,6 +37,69 @@ export function geminiModelInfo(model: string): ModelInfo {
   return info;
 }
 
+/**
+ * Strict OpenAPI 3.0 subset schema for Gemini JSON output.
+ * Does not include minItems or additionalProperties, which are rejected by Gemini's schema validator.
+ */
+export function geminiOptionSchema(key = 'options'): Schema {
+  return {
+    type: Type.OBJECT,
+    properties: {
+      [key]: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            label: { type: Type.STRING, description: '1–4 lowercase words naming the musical idea or the fix' },
+            code: { type: Type.STRING, description: 'Strudel code that replaces only the marked selection' },
+          },
+          required: ['label', 'code'],
+        },
+      },
+    },
+    required: [key],
+  };
+}
+
+/**
+ * Resolves the appropriate ThinkingConfig for the Gemini model.
+ * Newer models (Gemini 3.x and 4.x) reject thinkingBudget with INVALID_ARGUMENT (400)
+ * and require thinkingLevel instead. Legacy models (Gemini 2.5) use thinkingBudget.
+ */
+export function resolveGeminiThinkingConfig(
+  modelId: string,
+  thinking: ThinkingSetting,
+  effort?: Effort,
+): GenerateContentConfig['thinkingConfig'] {
+  // Gemini 3.x and 4.x models use thinkingLevel
+  if (modelId.startsWith('gemini-3') || modelId.startsWith('gemini-4')) {
+    if (modelId === 'gemini-3.5-flash-lite') {
+      if (thinking === 'off') {
+        return { thinkingLevel: ThinkingLevel.MINIMAL };
+      }
+      if (effort === 'high') return { thinkingLevel: ThinkingLevel.HIGH };
+      if (effort === 'medium') return { thinkingLevel: ThinkingLevel.MEDIUM };
+      return { thinkingLevel: ThinkingLevel.LOW };
+    }
+
+    // gemini-3.8-flash, gemini-4-argon (support LOW, MEDIUM, HIGH)
+    if (thinking === 'off') {
+      return { thinkingLevel: ThinkingLevel.LOW };
+    }
+    if (effort === 'high') return { thinkingLevel: ThinkingLevel.HIGH };
+    if (effort === 'medium') return { thinkingLevel: ThinkingLevel.MEDIUM };
+    return { thinkingLevel: ThinkingLevel.LOW };
+  }
+
+  // Legacy models (Gemini 2.5 series) use thinkingBudget
+  if (thinking === 'off') {
+    return { thinkingBudget: 0 };
+  } else if (thinking === 'adaptive') {
+    return { thinkingBudget: -1 };
+  }
+  return undefined;
+}
+
 export function buildGeminiParams(
   deps: GeminiDeps,
   req: RemoteRequest,
@@ -45,20 +108,26 @@ export function buildGeminiParams(
 ): GenerateContentParameters {
   const info = geminiModelInfo(req.model);
   const thinking = req.thinking ?? info.defaults.thinking;
+  const effort = req.effort ?? info.defaults.effort;
   const systemInstruction = `${staticSystem(deps.reference)}\n\n${soundsSystem(req.sounds)}`;
+
+  // For Gemini, thinking tokens share maxOutputTokens with candidate tokens.
+  // We cap single-option calls at 800 tokens (or deps.maxTokens if smaller) so thinking
+  // plus response can complete without truncation or INVALID_ARGUMENT rejection.
+  const singleCap = Math.min(800, deps.maxTokens);
+  const maxOutputTokens = opts.maxTokens ?? (opts.single ? singleCap : deps.maxTokens);
 
   const config: GenerateContentConfig = {
     systemInstruction,
     responseMimeType: 'application/json',
-    responseSchema: optionSchema() as any,
-    maxOutputTokens: opts.maxTokens ?? (opts.single ? Math.min(400, deps.maxTokens) : deps.maxTokens),
+    responseSchema: geminiOptionSchema(),
+    maxOutputTokens,
     ...(signal ? { abortSignal: signal } : {}),
   };
 
-  if (thinking === 'off') {
-    config.thinkingConfig = { thinkingBudget: 0 };
-  } else if (thinking === 'adaptive') {
-    config.thinkingConfig = { thinkingBudget: -1 };
+  const thinkingConfig = resolveGeminiThinkingConfig(info.id, thinking, effort);
+  if (thinkingConfig) {
+    config.thinkingConfig = thinkingConfig;
   }
 
   return {
@@ -152,7 +221,15 @@ async function* oneCall(
       if (candidate?.finishReason) {
         finishReason = candidate.finishReason;
       }
-      const text = chunk.text;
+      const parts = candidate?.content?.parts;
+      let text = '';
+      if (parts && parts.length > 0) {
+        for (const p of parts) {
+          if (!p.thought && p.text) text += p.text;
+        }
+      } else if (chunk.text) {
+        text = chunk.text;
+      }
       if (text) {
         const step = parser.push(text);
         problems.push(...step.errors);
@@ -266,7 +343,7 @@ export async function warmUp(deps: GeminiDeps, req: Pick<RemoteRequest, 'model' 
   };
   let done: Extract<RemoteLine, { type: 'done' }> | null = null;
   let error: Extract<RemoteLine, { type: 'error' }> | null = null;
-  for await (const line of oneCall(deps, warm, geminiModelInfo(req.model), signal, { single: true, maxTokens: 200 }, 1)) {
+  for await (const line of oneCall(deps, warm, geminiModelInfo(req.model), signal, { single: true, maxTokens: Math.min(800, deps.maxTokens) }, 1)) {
     if (line.type === 'done') done = line;
     if (line.type === 'error' && line.kind !== 'truncated') error = line;
   }

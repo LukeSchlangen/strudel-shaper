@@ -51,10 +51,18 @@ describe('buildGeminiParams', () => {
     expect(user).toContain('Instruction: busier');
   });
 
-  it('sets thinkingBudget: 0 for thinking off, and -1 for adaptive', () => {
+  it('configures thinkingLevel for Gemini 3/4 models and thinkingBudget for legacy models', () => {
     const c = new FakeGemini([]);
-    expect(buildGeminiParams(deps(c), { ...req, thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingBudget: 0 });
-    expect(buildGeminiParams(deps(c), { ...req, thinking: 'adaptive' }).config?.thinkingConfig).toEqual({ thinkingBudget: -1 });
+    // gemini-3.5-flash-lite uses MINIMAL for off
+    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-3.5-flash-lite', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingLevel: 'MINIMAL' });
+    // gemini-3.8-flash uses LOW for off, and respects effort on adaptive
+    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-3.8-flash', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingLevel: 'LOW' });
+    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-3.8-flash', thinking: 'adaptive', effort: 'high' }).config?.thinkingConfig).toEqual({ thinkingLevel: 'HIGH' });
+    // gemini-4-argon uses LOW for off
+    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-4-argon', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingLevel: 'LOW' });
+    // legacy models use thinkingBudget
+    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-2.5-flash', thinking: 'off' }).config?.thinkingConfig).toEqual({ thinkingBudget: 0 });
+    expect(buildGeminiParams(deps(c), { ...req, model: 'gemini-2.5-flash', thinking: 'adaptive' }).config?.thinkingConfig).toEqual({ thinkingBudget: -1 });
   });
 
   it('phrases retries as feedback and asks for one option', () => {
@@ -155,7 +163,7 @@ describe('warmUp', () => {
     const client = new FakeGemini([geminiTextChunks(payload(1))]);
     const result = await warmUp(deps(client), { model: 'gemini-3.8-flash' }, new AbortController().signal);
     expect(result.done).toBeDefined();
-    expect(client.calls[0].params.config?.maxOutputTokens).toBe(200);
+    expect(client.calls[0].params.config?.maxOutputTokens).toBe(800);
   });
 });
 

@@ -142,7 +142,7 @@ describe('Response token and size bounds', () => {
 
     const depsGemini = { client: new FakeGemini([]), reference: 'REF', maxTokens: 1024 };
     const pGeminiSingle = buildGeminiParams(depsGemini, baseReq, { single: true });
-    expect(pGeminiSingle.config?.maxOutputTokens).toBeLessThanOrEqual(400);
+    expect(pGeminiSingle.config?.maxOutputTokens).toBeLessThanOrEqual(800);
   });
 
   it('rejects bloated option code output', () => {

@@ -29,7 +29,15 @@ export function mapError(err: unknown): MappedError {
   }
 
   if (err instanceof ApiError) {
-    const msg = err.message || '';
+    const rawMsg = err.message || '';
+    let msg = rawMsg;
+    try {
+      const parsed = JSON.parse(rawMsg);
+      if (parsed.error?.message) {
+        msg = parsed.error.message;
+      }
+    } catch {}
+
     if (err.status === 401 || err.status === 403 || msg.includes('API_KEY_INVALID') || msg.includes('API key not valid')) {
       return { kind: 'auth', message: 'The API key was rejected. Check GEMINI_API_KEY in .env.' };
     }
